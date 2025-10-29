@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profesyonel Menü</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: transparent; overflow: hidden; color: white; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        
+        .menu-container {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 900px;
+            height: 550px;
+            background: rgba(15, 15, 20, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .menu-title { font-size: 24px; font-weight: 600; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
+        .menu-id { font-size: 14px; color: rgba(255, 255, 255, 0.7); background: rgba(0, 0, 0, 0.3); padding: 5px 10px; border-radius: 4px; }
+
+        .menu-content { display: flex; height: calc(100% - 80px); }
+        
+        .sidebar {
+            width: 250px;
+            background: rgba(10, 10, 15, 0.8);
+            padding: 20px 0;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-item {
+            padding: 15px 25px;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .menu-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+        .menu-item.active { background: rgba(30, 144, 255, 0.2); color: #1e90ff; border-left: 3px solid #1e90ff; }
+
+        .content-area { flex: 1; padding: 25px; overflow-y: auto; }
+        .content-section { display: none; }
+        .content-section.active { display: block; animation: fadeIn 0.3s ease; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .section-title {
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: rgba(30, 30, 40, 0.7);
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 3px solid #1e90ff;
+        }
+
+        .stat-title {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 25px;
+            background: rgba(10, 10, 15, 0.9);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .key-hint {
+            display: flex;
+            gap: 15px;
+        }
+
+        .key {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(30, 144, 255, 0.5);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-container" id="menuContainer">
+        <div class="menu-header">
+            <div class="menu-title">Portefeuille</div>
+            <div class="menu-id">ID Unique: 11994 | ID Temporaire: 31</div>
+        </div>
+        
+        <div class="menu-content">
+            <div class="sidebar">
+                <div class="menu-item active" data-target="stats">📊 Statut des entreprises (54)</div>
+                <div class="menu-item" data-target="items">🎒 Objets</div>
+                <div class="menu-item" data-target="radio">📻 Radio</div>
+                <div class="menu-item" data-target="preferences">⚙️ Préférences</div>
+                <div class="menu-item" data-target="guide">📖 Guide</div>
+                <div class="menu-item" data-target="vip">⭐ Menu VIP</div>
+            </div>
+            
+            <div class="content-area">
+                <div class="content-section active" id="stats">
+                    <h2 class="section-title">Statut des entreprises</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-title">Entreprise 1</div>
+                            <div class="stat-value">Actif</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-title">Entreprise 2</div>
+                            <div class="stat-value">En attente</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-title">Entreprise 3</div>
+                            <div class="stat-value">Actif</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-title">Entreprise 4</div>
+                            <div class="stat-value">Inactif</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="content-section" id="items">
+                    <h2 class="section-title">Objets</h2>
+                    <p>Envanter içeriği burada görünecek...</p>
+                </div>
+                
+                <div class="content-section" id="radio">
+                    <h2 class="section-title">Radio</h2>
+                    <p>Radyo istasyonları burada...</p>
+                </div>
+                
+                <div class="content-section" id="preferences">
+                    <h2 class="section-title">Préférences</h2>
+                    <p>Ayarlarınız burada...</p>
+                </div>
+                
+                <div class="content-section" id="guide">
+                    <h2 class="section-title">Guide</h2>
+                    <p>Kullanım kılavuzu...</p>
+                </div>
+                
+                <div class="content-section" id="vip">
+                    <h2 class="section-title">Menu VIP</h2>
+                    <p>VIP özellikleri...</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="key-hint">
+                <div><span class="key">↑↓</span> Navigation</div>
+                <div><span class="key">ENTER</span> Sélectionner</div>
+                <div><span class="key">BACKSPACE</span> Retour</div>
+                <div><span class="key">SUPPR</span> Fermer</div>
+            </div>
+            <div>Actions Disponibles</div>
+        </div>
+    </div>
+
+    <script>
+        let menuOpen = false;
+        let currentMenuItem = 0;
+        const menuItems = document.querySelectorAll('.menu-item');
+        const contentSections = document.querySelectorAll('.content-section');
+
+        // FiveM NUI mesajlarını dinle
+        window.addEventListener('message', function(event) {
+            const data = event.data;
+            
+            if (data.action === 'openMenu') {
+                openMenu();
+            } else if (data.action === 'closeMenu') {
+                closeMenu();
+            } else if (data.action === 'navigate') {
+                handleNavigation(data.direction);
+            }
+        });
+
+        // NUI callback'leri
+        window.registerNUICallback = function(name, callback) {
+            // Callback kaydı
+        };
+
+        function openMenu() {
+            if (menuOpen) return;
+            
+            const menuContainer = document.getElementById('menuContainer');
+            menuContainer.style.display = 'block';
+            menuOpen = true;
+            currentMenuItem = 0;
+            updateMenuSelection();
+            
+            // FiveM'e menü açıldığını bildir
+            fetch(`https://${GetParentResourceName()}/menuOpened`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            });
+        }
+
+        function closeMenu() {
+            if (!menuOpen) return;
+            
+            const menuContainer = document.getElementById('menuContainer');
+            menuContainer.style.display = 'none';
+            menuOpen = false;
+            
+            // FiveM'e menü kapandığını bildir
+            fetch(`https://${GetParentResourceName()}/menuClosed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            });
+        }
+
+        function handleNavigation(direction) {
+            if (!menuOpen) return;
+            
+            switch(direction) {
+                case 'up':
+                    currentMenuItem = (currentMenuItem - 1 + menuItems.length) % menuItems.length;
+                    break;
+                case 'down':
+                    currentMenuItem = (currentMenuItem + 1) % menuItems.length;
+                    break;
+                case 'enter':
+                    const selectedItem = menuItems[currentMenuItem];
+                    const target = selectedItem.getAttribute('data-target');
+                    console.log('Selected menu:', target);
+                    
+                    // FiveM'e seçimi bildir
+                    fetch(`https://${GetParentResourceName()}/menuSelect`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({item: target})
+                    });
+                    break;
+                case 'back':
+                    // FiveM'e geri tuşuna basıldığını bildir
+                    fetch(`https://${GetParentResourceName()}/menuBack`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({})
+                    });
+                    break;
+            }
+            updateMenuSelection();
+        }
+
+        function updateMenuSelection() {
+            menuItems.forEach((item, index) => {
+                if (index === currentMenuItem) {
+                    item.classList.add('active');
+                    const target = item.getAttribute('data-target');
+                    contentSections.forEach(section => {
+                        section.classList.remove('active');
+                        if (section.id === target) {
+                            section.classList.add('active');
+                        }
+                    });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // Mouse events
+        menuItems.forEach((item, index) => {
+            item.addEventListener('click', () => {
+                currentMenuItem = index;
+                updateMenuSelection();
+                
+                // FiveM'e tıklamayı bildir
+                const target = item.getAttribute('data-target');
+                fetch(`https://${GetParentResourceName()}/menuSelect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({item: target})
+                });
+            });
+        });
+
+        // Sayfa yüklendiğinde menüyü gizle
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('menuContainer').style.display = 'none';
+        });
+
+        // GetParentResourceName fonksiyonu (FiveM için)
+        if (typeof GetParentResourceName === 'undefined') {
+            window.GetParentResourceName = function() {
+                return 'profesyonel-menu';
+            };
+        }
+    </script>
+</body>
+</html>
