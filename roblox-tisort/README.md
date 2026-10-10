@@ -1,18 +1,39 @@
 # Roblox T-Shirt Tasarımları
 
-![Önizleme](onizleme.png)
+Hepsi **512x512, şeffaf arka planlı PNG**. Kalın koyu kontur sayesinde siyah, beyaz veya renkli her gömleğin üstünde görünür.
+
+## Yeni seri (araştırmaya göre)
+![Yeni seri](onizleme_yeni.png)
+
+| Dosya | Neden satar |
+|---|---|
+| `4_kawaii_tavsan.png` | Sevimli hayvan tasarımlarında **tavşan 1. sırada**. Pastel renkli, sticker tarzı. |
+| `5_y2k_piksel_kalp.png` | 2026'da **Y2K, piksel ve neon** tarzı yükselişte. Koyu gömleklerde parlar. |
+| `6_mutlu_filiz.png` | **Grow a Garden** en çok oynanan oyun. Bahçe temasını telif sorunu olmadan kullanır. |
+| `7_sakin_kapibara.png` | Viral kapibara meme'i: herkesin tanıdığı, her yaşa hitap eden bir tasarım. |
+
+## İlk seri
+![İlk seri](onizleme.png)
 
 | Dosya | Kime hitap eder |
 |---|---|
-| `1_sevimli_kedi.png` | Her yaş, her cinsiyet. Kawaii/sevimli kategorisi Roblox'ta en çok satanlardan. |
-| `2_havali_smiley.png` | Meme / "cool" kitle. Herkesin tanıdığı ikon, küçükte bile okunur. |
+| `1_sevimli_kedi.png` | Sevimli hayvanlarda 2. sıra. Her yaş, her cinsiyet. |
+| `2_havali_smiley.png` | Meme / "cool" kitle. Küçük göründüğünde bile okunur. |
 | `3_good_vibes.png` | Aesthetic / pozitif kitle. İngilizce olduğu için tüm dünyaya satılır. |
 
-Hepsi **512x512, şeffaf arka planlı PNG**. Kalın koyu kontur sayesinde siyah, beyaz veya renkli her gömlek üstünde görünür.
+## 2026 kuralları (önemli)
+- Her T-shirt yüklemesi **10 Robux**. Tasarım reddedilirse para iade edilmez.
+- Satış yapmak için **Roblox Premium** gerekiyor.
+- Her satıştan **%70** sana kalır. En düşük fiyat 5 Robux.
+- Başka oyunların logosu, marka logoları veya kopya tasarımlar reddedilir. Bu yüzden tasarımlarda hiç logo yok.
+
+## Satış ipuçları
+1. Fiyatı **5 Robux** yap. Ucuz T-shirt'ler çok daha fazla satar.
+2. Başlığa aranan kelimeleri yaz: `Cute Bunny ❤️ Kawaii Pastel Aesthetic T-Shirt`, `Capybara Orange Meme T-Shirt`, `Y2K Pixel Heart Neon`.
+3. İlk olarak tavşan, kapibara ve kedi tasarımlarını yükle. Bunlar en geniş kitleye hitap ediyor.
+4. Kendi giy ve popüler oyunlarda dolaş. Diğer oyuncular tasarımına tıklayıp satın alabilir.
 
 ## Yükleme
-1. create.roblox.com > Creations > Avatar Items > **T-Shirt** > görseli yükle.
-2. Onaylanınca mağazada **5 Robux**'a sat (T-shirt'ler ucuz olunca çok satar).
-3. Başlıkta anahtar kelime kullan: "Cute Cat T-Shirt ❤️ Kawaii Aesthetic" gibi.
+create.roblox.com > Creations > Avatar Items > **T-Shirt** > görseli yükle > onay sonrası satışa aç.
 
-Tasarımı değiştirmek için: `python3 olustur.py` (Pillow gerekir).
+Tasarımları değiştirmek için `python3 olustur.py` komutunu çalıştır (Pillow gerekir).
