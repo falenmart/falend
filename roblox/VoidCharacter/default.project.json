@@ -1,0 +1,17 @@
+{
+  "name": "VoidCharacter",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "VoidConfig": { "$path": "src/ReplicatedStorage/VoidConfig.lua" }
+    },
+    "ServerScriptService": {
+      "VoidServer": { "$path": "src/ServerScriptService/VoidServer.server.lua" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "VoidClient": { "$path": "src/StarterPlayerScripts/VoidClient.client.lua" }
+      }
+    }
+  }
+}
