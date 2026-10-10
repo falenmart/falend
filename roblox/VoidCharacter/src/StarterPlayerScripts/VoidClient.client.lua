@@ -8,8 +8,16 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 
-local Config = require(ReplicatedStorage:WaitForChild("VoidConfig"))
-local remotes = ReplicatedStorage:WaitForChild("VoidRemotes")
+print("[Void] VoidClient başladı")
+local configModule = ReplicatedStorage:WaitForChild("VoidConfig", 5)
+if not configModule or not configModule:IsA("ModuleScript") then
+	error("[Void] ReplicatedStorage içinde 'VoidConfig' adında bir ModuleScript bulunamadı!")
+end
+local Config = require(configModule)
+local remotes = ReplicatedStorage:WaitForChild("VoidRemotes", 10)
+if not remotes then
+	error("[Void] VoidRemotes yok -> VoidServer çalışmıyor. ServerScriptService içinde 'Script' olarak durduğundan emin ol.")
+end
 local abilityRemote = remotes:WaitForChild("Ability")
 local cutsceneRemote = remotes:WaitForChild("Cutscene")
 local fxRemote = remotes:WaitForChild("Fx")
@@ -487,3 +495,5 @@ player.CharacterAdded:Connect(function()
 	inCutscene = false
 	camera.CameraType = Enum.CameraType.Custom
 end)
+
+print("[Void] VoidClient hazır - HUD altta görünmeli")

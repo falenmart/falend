@@ -7,7 +7,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
-local Config = require(ReplicatedStorage:WaitForChild("VoidConfig"))
+print("[Void] VoidServer başladı")
+local configModule = ReplicatedStorage:WaitForChild("VoidConfig", 5)
+if not configModule or not configModule:IsA("ModuleScript") then
+	error("[Void] ReplicatedStorage içinde 'VoidConfig' adında bir ModuleScript bulunamadı! (Script değil, ModuleScript olmalı)")
+end
+local Config = require(configModule)
 
 local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
 
@@ -640,3 +645,5 @@ Players.PlayerRemoving:Connect(function(player)
 	end
 	states[player] = nil
 end)
+
+print("[Void] VoidServer hazır")
