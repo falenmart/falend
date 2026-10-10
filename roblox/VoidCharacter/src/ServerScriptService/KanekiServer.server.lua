@@ -8,8 +8,13 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 print("[Kaneki] KanekiServer başladı")
-local K = require(ReplicatedStorage:WaitForChild("KanekiConfig"))
-local RigPose = require(ReplicatedStorage:WaitForChild("RigPose"))
+for _, name in ipairs({ "KanekiConfig", "RigPose", "CharacterList" }) do
+	if not ReplicatedStorage:WaitForChild(name, 5) then
+		error("[Kaneki] ReplicatedStorage içinde '" .. name .. "' ModuleScript'i yok! Paketten ReplicatedStorage'a taşı.")
+	end
+end
+local K = require(ReplicatedStorage.KanekiConfig)
+local RigPose = require(ReplicatedStorage.RigPose)
 
 local remotes = Instance.new("Folder")
 remotes.Name = "KanekiRemotes"

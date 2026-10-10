@@ -9,7 +9,11 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 print("[Kaneki] KanekiClient başladı")
-local K = require(ReplicatedStorage:WaitForChild("KanekiConfig"))
+local kc = ReplicatedStorage:WaitForChild("KanekiConfig", 5)
+if not kc then
+	error("[Kaneki] ReplicatedStorage içinde 'KanekiConfig' ModuleScript'i yok! Paketten ReplicatedStorage'a taşı.")
+end
+local K = require(kc)
 local remotes = ReplicatedStorage:WaitForChild("KanekiRemotes", 10)
 if not remotes then
 	error("[Kaneki] KanekiRemotes yok -> KanekiServer çalışmıyor (ServerScriptService'te Script olmalı)")
