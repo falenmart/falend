@@ -63,6 +63,11 @@ end
 
 local inCutscene = false
 
+-- Bu güçler sadece karakter seçiminde "Sentry" seçiliyse çalışır
+local function isSentry()
+	return player:GetAttribute("SelectedCharacter") == "Sentry"
+end
+
 local function tween(obj, time, props, style, dir)
 	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
 	t:Play()
@@ -497,7 +502,7 @@ cutsceneRemote.OnClientEvent:Connect(function(char, startTime, cfg)
 		tween(bottomBar, 0.5, { Size = UDim2.fromScale(1, 0) })
 		task.delay(0.5, function()
 			cine.Visible = false
-			bar.Visible = true
+			bar.Visible = isSentry()
 		end)
 		inCutscene = false
 	else
@@ -517,7 +522,7 @@ local keyToAbility = {
 }
 
 UserInputService.InputBegan:Connect(function(input, processed)
-	if processed or inCutscene then
+	if processed or inCutscene or not isSentry() then
 		return
 	end
 	if input.KeyCode == Config.Keys.Fly then
@@ -540,5 +545,14 @@ player.CharacterAdded:Connect(function()
 	inCutscene = false
 	camera.CameraType = Enum.CameraType.Custom
 end)
+
+local function refreshSelection()
+	bar.Visible = isSentry() and not inCutscene
+	if not isSentry() then
+		stopFlying()
+	end
+end
+player:GetAttributeChangedSignal("SelectedCharacter"):Connect(refreshSelection)
+refreshSelection()
 
 print("[Void] VoidClient hazır - HUD altta görünmeli")

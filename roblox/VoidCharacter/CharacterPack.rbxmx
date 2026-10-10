@@ -1,0 +1,2694 @@
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Folder" referent="RBX14"><Properties><string name="Name">CharacterPack</string></Properties><Item class="Folder" referent="RBX5"><Properties><string name="Name">ReplicatedStorage  ->  ReplicatedStorage içine taşı</string></Properties><Item class="ModuleScript" referent="RBX1"><Properties><string name="Name">CharacterList</string><ProtectedString name="Source"><![CDATA[-- CharacterList (ModuleScript) -> ReplicatedStorage
+-- Seçim menüsündeki karakterler. Yeni karakter eklemek için buraya bir satır ekle.
+
+return {
+	{
+		Id = "Sentry",
+		Name = "Sentry (Void)",
+		Description = "Uçar, simsiyah Void formuna girer, gölgeleriyle düşmanlarını yok eder. Cutscene'li ultimate.",
+		Keys = "F uç · Z Void · X Kavrayış · C Dalga · G Boşluk",
+		Color = Color3.fromRGB(30, 32, 45),
+		Accent = Color3.fromRGB(230, 235, 255),
+	},
+	{
+		Id = "Kaneki",
+		Name = "Ken Kaneki",
+		Description = "Parmağını kütletip kagunesini açar. Dört dokunaçla saplar, savurur ve yakalar.",
+		Keys = "E Kagune · X Saplama · C Fırtına · V Yakalama",
+		Color = Color3.fromRGB(45, 8, 12),
+		Accent = Color3.fromRGB(255, 70, 80),
+	},
+	{
+		Id = "None",
+		Name = "Normal",
+		Description = "Güç yok, sıradan karakter.",
+		Keys = "",
+		Color = Color3.fromRGB(35, 35, 38),
+		Accent = Color3.fromRGB(200, 200, 205),
+	},
+}
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX2"><Properties><string name="Name">KanekiConfig</string><ProtectedString name="Source"><![CDATA[-- KanekiConfig (ModuleScript) -> ReplicatedStorage
+-- Kaneki karakterinin tüm ayarları.
+
+local K = {}
+
+K.Keys = {
+	Kagune = Enum.KeyCode.E,  -- parmak kütlet + kaguneyi aç/kapa
+	Strike = Enum.KeyCode.X,  -- dört dokunaçla öne saplama
+	Flurry = Enum.KeyCode.C,  -- etrafa dokunaç fırtınası
+	Grab = Enum.KeyCode.V,    -- hedefi yakala, havaya kaldır, yere çarp
+}
+
+K.Cooldowns = {
+	Kagune = 3,
+	Strike = 1.8,
+	Flurry = 7,
+	Grab = 10,
+}
+
+K.Strike = { Range = 22, ConeAngle = 40, Damage = 22, Knockback = 55 }
+K.Flurry = { Radius = 16, Hits = 8, Interval = 0.18, Damage = 6 }
+K.Grab = { Range = 28, ConeAngle = 45, LiftHeight = 8, Damage = 45 }
+
+-- Kagune açıkken yürüme hızı
+K.WalkSpeed = 22
+
+-- Kagune açık ve karakter duruyorsa bu kadar saniye sonra kendiliğinden parmak kütletir
+K.IdleCrackAfter = 7
+
+-- Kagune görünümü
+K.Kagune = {
+	Length = 10,     -- dokunaç uzunluğu (stud)
+	Segments = 18,   -- dokunaç başına parça sayısı (fazlası daha pürüzsüz ama daha ağır)
+	BaseWidth = 1.2,
+	TipWidth = 0.2,
+	BaseColor = Color3.fromRGB(70, 0, 8),
+	TipColor = Color3.fromRGB(230, 25, 40),
+}
+K.EyeColor = Color3.fromRGB(255, 20, 30)
+
+-- Sesler (Roblox'un hazır sesleri; Toolbox'tan daha iyilerini "rbxassetid://NUMARA" ile koyabilirsin)
+K.Sounds = {
+	Crack = { Id = "rbxasset://sounds/clickfast.wav", Volume = 1.6, Speed = 1.5 },
+	KaguneOut = { Id = "rbxasset://sounds/Rocket whoosh.wav", Volume = 1.2, Speed = 0.8 },
+	KaguneIn = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.8, Speed = 0.7 },
+	Strike = { Id = "rbxasset://sounds/swoosh.wav", Volume = 1.2, Speed = 1.3 },
+	Hit = { Id = "rbxasset://sounds/collide.wav", Volume = 1, Speed = 0.9 },
+	Flurry = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.9, Speed = 1.7 },
+	Slam = { Id = "rbxasset://sounds/collide.wav", Volume = 2.2, Speed = 0.45 },
+}
+
+return K
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX3"><Properties><string name="Name">RigPose</string><ProtectedString name="Source"><![CDATA[-- RigPose (ModuleScript) -> ReplicatedStorage
+-- Animasyon dosyası olmadan eklemleri (omuz, dirsek, bilek, boyun, bel) döndürür.
+-- Hem eski Motor6D hem de yeni AnimationConstraint eklemleriyle çalışır.
+-- Sunucuda çağrılırsa herkes görür.
+
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local RigPose = {}
+
+local original = setmetatable({}, { __mode = "k" })
+local active = setmetatable({}, { __mode = "k" })
+
+local JOINT_NAMES = {
+	"RightShoulder", "LeftShoulder", "RightElbow", "LeftElbow",
+	"RightWrist", "LeftWrist", "Neck", "Waist",
+	"RightHip", "LeftHip", "RightKnee", "LeftKnee",
+}
+
+local function findJoint(char, name)
+	for _, d in ipairs(char:GetDescendants()) do
+		if d.Name == name and (d:IsA("Motor6D") or d:IsA("AnimationConstraint")) then
+			return d
+		end
+	end
+	return nil
+end
+
+-- Motor6D -> C0, AnimationConstraint -> Attachment0.CFrame
+local function handle(joint)
+	if not joint then
+		return nil
+	end
+	if joint:IsA("Motor6D") then
+		local ok = pcall(function()
+			joint.C0 = joint.C0
+		end)
+		if ok then
+			return joint, "C0"
+		end
+	end
+	local ok, att = pcall(function()
+		return joint.Attachment0
+	end)
+	if ok and att then
+		return att, "CFrame"
+	end
+	return nil
+end
+
+local function lerpTo(obj, prop, target, time, style)
+	local start = obj[prop]
+	local token = {}
+	active[obj] = token
+	if time <= 0 then
+		pcall(function()
+			obj[prop] = target
+		end)
+		return
+	end
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		if active[obj] ~= token or not obj.Parent then
+			conn:Disconnect()
+			return
+		end
+		local a = math.clamp((os.clock() - t0) / time, 0, 1)
+		local e = TweenService:GetValue(a, style, Enum.EasingDirection.Out)
+		pcall(function()
+			obj[prop] = start:Lerp(target, e)
+		end)
+		if a >= 1 then
+			conn:Disconnect()
+		end
+	end)
+end
+
+-- poses = { RightShoulder = CFrame.Angles(...), ... }  (orijinal duruşa göre dönüş)
+function RigPose.set(char, poses, time, style)
+	for name, rot in pairs(poses) do
+		local obj, prop = handle(findJoint(char, name))
+		if obj then
+			original[obj] = original[obj] or obj[prop]
+			lerpTo(obj, prop, original[obj] * rot, time or 0.25, style or Enum.EasingStyle.Quad)
+		end
+	end
+end
+
+function RigPose.reset(char, time)
+	local poses = {}
+	for _, name in ipairs(JOINT_NAMES) do
+		poses[name] = CFrame.identity
+	end
+	RigPose.set(char, poses, time or 0.3)
+end
+
+return RigPose
+]]></ProtectedString></Properties></Item><Item class="ModuleScript" referent="RBX4"><Properties><string name="Name">VoidConfig</string><ProtectedString name="Source"><![CDATA[-- VoidConfig (ModuleScript) -> ReplicatedStorage
+-- Tüm ayarlar burada. Hem server hem client bu modülü kullanır.
+
+local Config = {}
+
+-- Tuşlar
+Config.Keys = {
+	Fly = Enum.KeyCode.F,          -- uçmayı aç/kapa
+	VoidForm = Enum.KeyCode.Z,     -- simsiyah form + beyaz gözler
+	Grasp = Enum.KeyCode.X,        -- el uzat: tek hedefi gölgeye çevirip öldür
+	Wave = Enum.KeyCode.C,         -- el uzat: önündeki konide gölge dalgası
+	Ultimate = Enum.KeyCode.G,     -- CUTSCENE: herkesi gölgeye çevir (Void formu gerekir)
+	FlyUp = Enum.KeyCode.Space,
+	FlyDown = Enum.KeyCode.LeftControl,
+	FlyBoost = Enum.KeyCode.LeftShift,
+}
+
+-- Bekleme süreleri (saniye)
+Config.Cooldowns = {
+	VoidForm = 2,
+	Grasp = 6,
+	Wave = 8,
+	Ultimate = 30,
+}
+
+-- Uçuş
+Config.FlySpeed = 55
+Config.FlyBoostSpeed = 120
+
+-- Skill: Void Grasp (X)
+Config.Grasp = {
+	Range = 70,
+	ConeAngle = 35, -- derece
+}
+
+-- Skill: Void Wave (C)
+Config.Wave = {
+	Range = 45,
+	ConeAngle = 50,
+	Damage = 45,
+}
+
+-- Ultimate (G)
+Config.Ultimate = {
+	RequiresVoidForm = true,
+	Radius = 90,
+	RiseHeight = 16,
+	-- Cutscene zaman çizelgesi (saniye)
+	ArmsOpenAt = 2.0,
+	ImpactAt = 7.2,
+	EndAt = 10.5,
+	-- Repliklerin çıkış zamanı ve metni (istediğin gibi değiştir)
+	-- SoundId: kendi seslendirmeni Roblox'a yükleyip "rbxassetid://123..." olarak yaz (boş bırakılabilir)
+	Lines = {
+		{ At = 0.6, Text = "Herkes bir kahraman istedi...", SoundId = "" },
+		{ At = 3.0, Text = "Ama ışığın da bir gölgesi vardır.", SoundId = "" },
+		{ At = 5.4, Text = "Ben Sentry değilim. Ben Boşluğum.", SoundId = "" },
+	},
+}
+
+-- Ses efektleri
+-- Varsayılanlar Roblox'un içinde gelen sesler (her oyunda çalışır), kalın/karanlık olsun diye yavaşlatıldı.
+-- Daha iyi sesler için Toolbox > Audio'dan ses bulup Id'yi "rbxassetid://NUMARA" ile değiştir.
+Config.Sounds = {
+	Transform = { Id = "rbxasset://sounds/Rocket whoosh.wav", Volume = 1.2, Speed = 0.35 },
+	GraspCast = { Id = "rbxasset://sounds/swoosh.wav", Volume = 1, Speed = 0.55 },
+	GraspHit = { Id = "rbxasset://sounds/collide.wav", Volume = 1, Speed = 0.4 },
+	Wave = { Id = "rbxasset://sounds/Rocket whoosh.wav", Volume = 1.3, Speed = 0.6 },
+	Dissolve = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.7, Speed = 0.3 },
+	UltRise = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 0.8, Speed = 0.5, Looped = true },
+	UltLine = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.5, Speed = 0.25 },
+	UltImpact = { Id = "rbxasset://sounds/collide.wav", Volume = 2.5, Speed = 0.22 },
+	Fly = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.8, Speed = 0.8 },
+}
+
+-- Görsel
+Config.EyeColor = Color3.fromRGB(235, 245, 255)
+Config.ShadowColor = Color3.fromRGB(5, 5, 8)
+
+return Config
+]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX9"><Properties><string name="Name">ServerScriptService  ->  ServerScriptService içine taşı</string></Properties><Item class="Script" referent="RBX6"><Properties><string name="Name">CharacterSelectServer</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectServer (Script) -> ServerScriptService
+-- Oyuncu menüden karakter seçince: seçimi kaydeder, oyuncuyu öldürür ve otomatik yeniden doğurur.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+print("[Select] CharacterSelectServer başladı")
+local CharacterList = require(ReplicatedStorage:WaitForChild("CharacterList"))
+
+local valid = {}
+for _, c in ipairs(CharacterList) do
+	valid[c.Id] = true
+end
+
+local remote = Instance.new("RemoteEvent")
+remote.Name = "SelectCharacter"
+remote.Parent = ReplicatedStorage
+
+local lastSwitch = {}
+local RESPAWN_DELAY = 1.5
+
+remote.OnServerEvent:Connect(function(player, id)
+	if typeof(id) ~= "string" or not valid[id] then
+		return
+	end
+	if player:GetAttribute("SelectedCharacter") == id then
+		return
+	end
+	local now = os.clock()
+	if lastSwitch[player] and now - lastSwitch[player] < 3 then
+		return
+	end
+	lastSwitch[player] = now
+
+	player:SetAttribute("SelectedCharacter", id)
+
+	-- Öl ve yeni güçle yeniden doğ
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.Health > 0 then
+		hum.Health = 0
+	end
+	task.delay(RESPAWN_DELAY, function()
+		if player.Parent then
+			player:LoadCharacter()
+		end
+	end)
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	if player:GetAttribute("SelectedCharacter") == nil then
+		player:SetAttribute("SelectedCharacter", "None")
+	end
+end)
+for _, p in ipairs(Players:GetPlayers()) do
+	if p:GetAttribute("SelectedCharacter") == nil then
+		p:SetAttribute("SelectedCharacter", "None")
+	end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	lastSwitch[player] = nil
+end)
+
+print("[Select] CharacterSelectServer hazır")
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX7"><Properties><string name="Name">KanekiServer</string><ProtectedString name="Source"><![CDATA[-- KanekiServer (Script) -> ServerScriptService
+-- Kaneki: parmak kütletme animasyonu, kagune aç/kapa, saldırılar ve hasar.
+-- Kagune dokunaçlarının kendisi her oyuncunun ekranında (KanekiClient) çizilir; burası mantığı yönetir.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+print("[Kaneki] KanekiServer başladı")
+local K = require(ReplicatedStorage:WaitForChild("KanekiConfig"))
+local RigPose = require(ReplicatedStorage:WaitForChild("RigPose"))
+
+local remotes = Instance.new("Folder")
+remotes.Name = "KanekiRemotes"
+remotes.Parent = ReplicatedStorage
+local abilityRemote = Instance.new("RemoteEvent")
+abilityRemote.Name = "Ability"
+abilityRemote.Parent = remotes
+local fxRemote = Instance.new("RemoteEvent")
+fxRemote.Name = "Fx"
+fxRemote.Parent = remotes
+
+local fxFolder = Instance.new("Folder")
+fxFolder.Name = "KanekiFx"
+fxFolder.Parent = workspace
+
+local states = {}
+local function getState(player)
+	local s = states[player]
+	if not s then
+		s = { busy = false, cooldowns = {}, idle = 0, baseSpeed = 16 }
+		states[player] = s
+	end
+	return s
+end
+
+local function isKaneki(player)
+	return player:GetAttribute("SelectedCharacter") == "Kaneki"
+end
+
+local function getAlive(player)
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if hum and root and hum.Health > 0 then
+		return char, hum, root
+	end
+	return nil
+end
+
+local function tween(obj, time, props, style, dir)
+	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
+	t:Play()
+	return t
+end
+
+local function playSound(key, parent)
+	local cfg = K.Sounds[key]
+	if not cfg or not parent then
+		return
+	end
+	local snd = Instance.new("Sound")
+	snd.SoundId = cfg.Id
+	snd.Volume = cfg.Volume or 1
+	snd.PlaybackSpeed = cfg.Speed or 1
+	snd.RollOffMaxDistance = 200
+	snd.Parent = parent
+	snd:Play()
+	Debris:AddItem(snd, 8)
+end
+
+local function hitBurst(pos)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Transparency = 1
+	p.Size = Vector3.one
+	p.CFrame = CFrame.new(pos)
+	p.Parent = fxFolder
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	e.Color = ColorSequence.new(K.Kagune.TipColor, K.Kagune.BaseColor)
+	e.LightEmission = 0.6
+	e.Size = NumberSequence.new(0.5, 0)
+	e.Speed = NumberRange.new(10, 22)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Lifetime = NumberRange.new(0.25, 0.5)
+	e.Rate = 0
+	e.Parent = p
+	e:Emit(25)
+	Debris:AddItem(p, 1)
+end
+
+---------------------------------------------------------------------
+-- Hedef bulma
+---------------------------------------------------------------------
+local function findHumanoidModel(part)
+	local model = part:FindFirstAncestorOfClass("Model")
+	while model do
+		local hum = model:FindFirstChildOfClass("Humanoid")
+		if hum then
+			return model, hum
+		end
+		model = model:FindFirstAncestorOfClass("Model")
+	end
+	return nil
+end
+
+local function findTargets(casterChar, origin, radius)
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { casterChar, fxFolder }
+	local found, list = {}, {}
+	for _, part in ipairs(workspace:GetPartBoundsInRadius(origin, radius, params)) do
+		local model, hum = findHumanoidModel(part)
+		if model and not found[model] and hum.Health > 0 then
+			local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or part
+			found[model] = true
+			table.insert(list, { model = model, hum = hum, root = root, dist = (root.Position - origin).Magnitude })
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.dist < b.dist
+	end)
+	return list
+end
+
+local function inCone(origin, dir, pos, angleDeg)
+	local to = pos - origin
+	if to.Magnitude < 0.1 then
+		return true
+	end
+	return dir:Dot(to.Unit) >= math.cos(math.rad(angleDeg))
+end
+
+local function damage(t, amount, knockDir, knockPower)
+	t.hum:TakeDamage(amount)
+	hitBurst(t.root.Position)
+	playSound("Hit", t.root)
+	if knockDir and knockPower and t.root:IsA("BasePart") and not t.root.Anchored then
+		t.root.AssemblyLinearVelocity = knockDir * knockPower + Vector3.new(0, knockPower * 0.35, 0)
+	end
+end
+
+---------------------------------------------------------------------
+-- Parmak kütletme animasyonu (Kaneki'nin klasik hareketi)
+---------------------------------------------------------------------
+local function crackFingers(char, root)
+	-- Sağ el göğüs hizasına gelir, kafa ele bakar
+	RigPose.set(char, {
+		RightShoulder = CFrame.Angles(math.rad(70), 0, math.rad(-35)),
+		RightElbow = CFrame.Angles(math.rad(100), 0, 0),
+		RightWrist = CFrame.Angles(math.rad(-10), 0, 0),
+		LeftShoulder = CFrame.Angles(math.rad(10), 0, 0),
+		Neck = CFrame.Angles(math.rad(-20), math.rad(-10), 0),
+	}, 0.35, Enum.EasingStyle.Quad)
+	task.wait(0.45)
+	-- Başparmakla işaret parmağını kütletir: bilek kısa sert hareketler
+	local hand = char:FindFirstChild("RightHand") or root
+	for _ = 1, 3 do
+		RigPose.set(char, { RightWrist = CFrame.Angles(math.rad(35), 0, math.rad(8)) }, 0.05)
+		playSound("Crack", hand)
+		task.wait(0.09)
+		RigPose.set(char, { RightWrist = CFrame.Angles(math.rad(-10), 0, 0) }, 0.08)
+		task.wait(0.22)
+	end
+	task.wait(0.1)
+end
+
+local function setKagune(player, char, hum, root, state, on)
+	if on then
+		state.busy = true
+		hum.WalkSpeed = 0 -- olduğu yerde animasyona girer
+		crackFingers(char, root)
+		if not char.Parent then
+			return
+		end
+		-- Kagune patlayarak açılır
+		RigPose.set(char, {
+			RightShoulder = CFrame.Angles(math.rad(20), 0, math.rad(25)),
+			LeftShoulder = CFrame.Angles(math.rad(20), 0, math.rad(-25)),
+			Waist = CFrame.Angles(math.rad(-15), 0, 0),
+			Neck = CFrame.Angles(math.rad(10), 0, 0),
+			RightElbow = CFrame.Angles(math.rad(30), 0, 0),
+			LeftElbow = CFrame.Angles(math.rad(30), 0, 0),
+		}, 0.15, Enum.EasingStyle.Back)
+		char:SetAttribute("KaguneOut", true)
+		playSound("KaguneOut", root)
+		hitBurst(root.Position + root.CFrame.LookVector * -1)
+		fxRemote:FireAllClients("Shake", root.Position, 0.7, 0.5)
+		task.wait(0.6)
+		RigPose.reset(char, 0.4)
+		hum.WalkSpeed = K.WalkSpeed
+		state.busy = false
+	else
+		char:SetAttribute("KaguneOut", false)
+		playSound("KaguneIn", root)
+		hum.WalkSpeed = state.baseSpeed
+	end
+end
+
+---------------------------------------------------------------------
+-- Saldırılar
+---------------------------------------------------------------------
+local function doStrike(char, root, dir)
+	local cfg = K.Strike
+	local targets = {}
+	for _, t in ipairs(findTargets(char, root.Position, cfg.Range)) do
+		if inCone(root.Position, dir, t.root.Position, cfg.ConeAngle) then
+			table.insert(targets, t)
+		end
+	end
+	local aim = targets[1] and targets[1].root.Position or (root.Position + dir * cfg.Range * 0.8)
+	fxRemote:FireAllClients("Strike", char, aim, 0.55)
+	playSound("Strike", root)
+	RigPose.set(char, { Waist = CFrame.Angles(math.rad(-12), 0, 0), RightShoulder = CFrame.Angles(math.rad(40), 0, 0) }, 0.1)
+	task.delay(0.55, function()
+		RigPose.reset(char, 0.3)
+	end)
+	task.delay(0.15, function()
+		for _, t in ipairs(targets) do
+			damage(t, cfg.Damage, dir, cfg.Knockback)
+		end
+	end)
+end
+
+local function doFlurry(char, root)
+	local cfg = K.Flurry
+	local duration = cfg.Hits * cfg.Interval + 0.3
+	fxRemote:FireAllClients("Flurry", char, duration)
+	RigPose.set(char, {
+		RightShoulder = CFrame.Angles(0, 0, math.rad(35)),
+		LeftShoulder = CFrame.Angles(0, 0, math.rad(-35)),
+		Waist = CFrame.Angles(math.rad(-8), 0, 0),
+	}, 0.2)
+	for _ = 1, cfg.Hits do
+		if not root.Parent then
+			break
+		end
+		playSound("Flurry", root)
+		for _, t in ipairs(findTargets(char, root.Position, cfg.Radius)) do
+			local away = t.root.Position - root.Position
+			away = away.Magnitude > 0.1 and away.Unit or root.CFrame.LookVector
+			damage(t, cfg.Damage, away, 12)
+		end
+		task.wait(cfg.Interval)
+	end
+	RigPose.reset(char, 0.3)
+end
+
+local function doGrab(char, root, dir)
+	local cfg = K.Grab
+	local target
+	for _, t in ipairs(findTargets(char, root.Position, cfg.Range)) do
+		if inCone(root.Position, dir, t.root.Position, cfg.ConeAngle) then
+			target = t
+			break
+		end
+	end
+	if not target or not target.root:IsA("BasePart") then
+		-- Boşa uzanır
+		fxRemote:FireAllClients("Strike", char, root.Position + dir * cfg.Range * 0.7, 0.5)
+		playSound("Strike", root)
+		return
+	end
+
+	local troot = target.root
+	fxRemote:FireAllClients("Grab", char, troot, 1.5)
+	playSound("Strike", root)
+	RigPose.set(char, { RightShoulder = CFrame.Angles(math.rad(80), 0, 0), Waist = CFrame.Angles(math.rad(-10), 0, 0) }, 0.15)
+
+	local wasAnchored = troot.Anchored
+	troot.Anchored = true
+	task.wait(0.2)
+	-- Havaya kaldır
+	local liftCF = CFrame.new(root.Position + dir * 7 + Vector3.new(0, cfg.LiftHeight, 0))
+	tween(troot, 0.5, { CFrame = liftCF }, Enum.EasingStyle.Back)
+	playSound("Hit", troot)
+	task.wait(0.75)
+	-- Yere çarp
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { char, target.model, fxFolder }
+	local hit = workspace:Raycast(liftCF.Position, Vector3.new(0, -60, 0), params)
+	local groundY = hit and hit.Position.Y + 3 or (root.Position.Y)
+	local slamPos = Vector3.new(liftCF.Position.X, groundY, liftCF.Position.Z)
+	RigPose.set(char, { RightShoulder = CFrame.Angles(math.rad(-20), 0, 0), Waist = CFrame.Angles(math.rad(-20), 0, 0) }, 0.12)
+	tween(troot, 0.15, { CFrame = CFrame.new(slamPos) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	task.wait(0.15)
+	if target.model.Parent then
+		damage(target, cfg.Damage)
+		playSound("Slam", troot)
+		fxRemote:FireAllClients("Shake", slamPos, 1, 0.5)
+	end
+	if troot.Parent and not wasAnchored then
+		troot.Anchored = false
+	end
+	task.wait(0.2)
+	RigPose.reset(char, 0.35)
+end
+
+---------------------------------------------------------------------
+-- İstekler
+---------------------------------------------------------------------
+abilityRemote.OnServerEvent:Connect(function(player, ability, aimDir)
+	if not isKaneki(player) then
+		return
+	end
+	local char, hum, root = getAlive(player)
+	if not char then
+		return
+	end
+	local state = getState(player)
+	if state.busy or typeof(ability) ~= "string" then
+		return
+	end
+	local cd = K.Cooldowns[ability]
+	if not cd then
+		return
+	end
+	local now = os.clock()
+	if (state.cooldowns[ability] or 0) > now then
+		return
+	end
+	local kaguneOut = char:GetAttribute("KaguneOut") == true
+	if ability ~= "Kagune" and not kaguneOut then
+		return -- saldırılar için önce kagune açılmalı
+	end
+
+	local dir = root.CFrame.LookVector
+	if typeof(aimDir) == "Vector3" and aimDir.Magnitude > 0.01 and aimDir.Magnitude < 2 then
+		dir = aimDir.Unit
+	end
+
+	state.cooldowns[ability] = now + cd
+	state.idle = 0
+	fxRemote:FireClient(player, "Cooldown", ability, cd)
+
+	task.spawn(function()
+		local ok, err = pcall(function()
+			if ability == "Kagune" then
+				setKagune(player, char, hum, root, state, not kaguneOut)
+			elseif ability == "Strike" then
+				doStrike(char, root, dir)
+			else
+				state.busy = true
+				if ability == "Flurry" then
+					doFlurry(char, root)
+				elseif ability == "Grab" then
+					doGrab(char, root, dir)
+				end
+			end
+		end)
+		if not ok then
+			warn("[Kaneki] Skill hatası:", err)
+			if hum.Parent and hum.Health > 0 then
+				hum.WalkSpeed = kaguneOut and K.WalkSpeed or state.baseSpeed
+			end
+		end
+		if ability ~= "Strike" then
+			state.busy = false
+		end
+	end)
+end)
+
+-- Dururken ara sıra kendiliğinden parmak kütletme (idle animasyonu)
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, player in ipairs(Players:GetPlayers()) do
+			if isKaneki(player) then
+				local char, hum, root = getAlive(player)
+				local state = getState(player)
+				if char and char:GetAttribute("KaguneOut") and not state.busy and hum.MoveDirection.Magnitude < 0.1 then
+					state.idle += 1
+					if state.idle >= K.IdleCrackAfter then
+						state.idle = 0
+						state.busy = true
+						task.spawn(function()
+							pcall(function()
+								crackFingers(char, root)
+								RigPose.reset(char, 0.35)
+							end)
+							state.busy = false
+						end)
+					end
+				else
+					state.idle = 0
+				end
+			end
+		end
+	end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(char)
+		local state = getState(player)
+		state.busy = false
+		state.idle = 0
+		local hum = char:WaitForChild("Humanoid")
+		state.baseSpeed = hum.WalkSpeed
+		char:SetAttribute("KaguneOut", false)
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	states[player] = nil
+end)
+
+print("[Kaneki] KanekiServer hazır")
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX8"><Properties><string name="Name">VoidServer</string><ProtectedString name="Source"><![CDATA[-- VoidServer (Script) -> ServerScriptService
+-- Void karakterinin sunucu tarafı: skill doğrulama, cooldown, hasar, gölge ölüm efekti,
+-- Void formu (simsiyah beden + beyaz gözler) ve ultimate cutscene akışı.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+print("[Void] VoidServer başladı")
+local configModule = ReplicatedStorage:WaitForChild("VoidConfig", 5)
+if not configModule or not configModule:IsA("ModuleScript") then
+	error("[Void] ReplicatedStorage içinde 'VoidConfig' adında bir ModuleScript bulunamadı! (Script değil, ModuleScript olmalı)")
+end
+local Config = require(configModule)
+
+local SMOKE_TEXTURE = "rbxasset://textures/particles/smoke_main.dds"
+
+-- Remote'lar
+local remotes = Instance.new("Folder")
+remotes.Name = "VoidRemotes"
+remotes.Parent = ReplicatedStorage
+
+local abilityRemote = Instance.new("RemoteEvent")
+abilityRemote.Name = "Ability"
+abilityRemote.Parent = remotes
+
+local cutsceneRemote = Instance.new("RemoteEvent")
+cutsceneRemote.Name = "Cutscene"
+cutsceneRemote.Parent = remotes
+
+local fxRemote = Instance.new("RemoteEvent")
+fxRemote.Name = "Fx"
+fxRemote.Parent = remotes
+
+local fxFolder = Instance.new("Folder")
+fxFolder.Name = "VoidFx"
+fxFolder.Parent = workspace
+
+local states = {} -- [player] = { voidForm, busy, cooldowns, eyes }
+
+local function getState(player)
+	local s = states[player]
+	if not s then
+		s = { voidForm = false, busy = false, cooldowns = {}, eyes = nil }
+		states[player] = s
+	end
+	return s
+end
+
+local function getAlive(player)
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if hum and root and hum.Health > 0 then
+		return char, hum, root
+	end
+	return nil
+end
+
+local function tween(obj, time, props, style, dir)
+	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
+	t:Play()
+	return t
+end
+
+local function makeSmoke(parent, rate, sizeA, sizeB, lifetime, speed)
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = SMOKE_TEXTURE
+	e.Color = ColorSequence.new(Config.ShadowColor)
+	e.LightEmission = 0
+	e.LightInfluence = 0
+	e.Rate = rate
+	e.Lifetime = NumberRange.new(lifetime * 0.6, lifetime)
+	e.Speed = NumberRange.new(speed * 0.4, speed)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Rotation = NumberRange.new(0, 360)
+	e.RotSpeed = NumberRange.new(-40, 40)
+	e.Acceleration = Vector3.new(0, 2, 0)
+	e.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, sizeA),
+		NumberSequenceKeypoint.new(1, sizeB),
+	})
+	e.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.25),
+		NumberSequenceKeypoint.new(0.6, 0.55),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	e.Parent = parent
+	return e
+end
+
+local function fxPart(props)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = Enum.Material.SmoothPlastic
+	p.Color = Config.ShadowColor
+	for k, v in pairs(props) do
+		p[k] = v
+	end
+	p.Parent = fxFolder
+	return p
+end
+
+---------------------------------------------------------------------
+-- Kol pozları — Motor6D (C0) ve yeni AnimationConstraint eklemleri desteklenir
+---------------------------------------------------------------------
+local RunService = game:GetService("RunService")
+local originalCF = setmetatable({}, { __mode = "k" })
+local activeLerp = setmetatable({}, { __mode = "k" })
+
+local function getShoulders(char)
+	local rua = char:FindFirstChild("RightUpperArm")
+	local lua = char:FindFirstChild("LeftUpperArm")
+	if rua and lua then
+		return rua:FindFirstChild("RightShoulder"), lua:FindFirstChild("LeftShoulder"), "R15"
+	end
+	local torso = char:FindFirstChild("Torso")
+	if torso then
+		return torso:FindFirstChild("Right Shoulder"), torso:FindFirstChild("Left Shoulder"), "R6"
+	end
+	return nil
+end
+
+-- Eklemin döndürülebilir kısmını bul: Motor6D -> C0, AnimationConstraint -> Attachment0.CFrame
+local function jointHandle(joint)
+	if not joint then
+		return nil
+	end
+	if joint:IsA("Motor6D") or joint:IsA("Weld") then
+		local ok = pcall(function()
+			joint.C0 = joint.C0
+		end)
+		if ok then
+			return joint, "C0"
+		end
+	end
+	local ok, att = pcall(function()
+		return joint.Attachment0
+	end)
+	if ok and att then
+		return att, "CFrame"
+	end
+	return nil
+end
+
+local function lerpCFrame(obj, prop, target, time, style)
+	local start = obj[prop]
+	local token = {}
+	activeLerp[obj] = token
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		if activeLerp[obj] ~= token or not obj.Parent then
+			conn:Disconnect()
+			return
+		end
+		local a = math.clamp((os.clock() - t0) / time, 0, 1)
+		local e = TweenService:GetValue(a, style, Enum.EasingDirection.Out)
+		pcall(function()
+			obj[prop] = start:Lerp(target, e)
+		end)
+		if a >= 1 then
+			conn:Disconnect()
+		end
+	end)
+end
+
+local function poseArms(char, pose, time)
+	local ok, err = pcall(function()
+		local rJoint, lJoint, rig = getShoulders(char)
+		local rObj, rProp = jointHandle(rJoint)
+		local lObj, lProp = jointHandle(lJoint)
+		if not (rObj and lObj) then
+			return
+		end
+		originalCF[rObj] = originalCF[rObj] or rObj[rProp]
+		originalCF[lObj] = originalCF[lObj] or lObj[lProp]
+		local r0, l0 = originalCF[rObj], originalCF[lObj]
+		local rT, lT = r0, l0
+
+		if pose == "Open" then -- kolları iki yana aç
+			if rig == "R15" then
+				rT = r0 * CFrame.Angles(math.rad(15), 0, math.rad(80))
+				lT = l0 * CFrame.Angles(math.rad(15), 0, math.rad(-80))
+			else
+				rT = r0 * CFrame.Angles(math.rad(-80), 0, 0)
+				lT = l0 * CFrame.Angles(math.rad(-80), 0, 0)
+			end
+		elseif pose == "Reach" then -- sağ eli öne uzat
+			if rig == "R15" then
+				rT = r0 * CFrame.Angles(math.rad(90), 0, 0)
+			else
+				rT = r0 * CFrame.Angles(0, 0, math.rad(90))
+			end
+		end
+
+		lerpCFrame(rObj, rProp, rT, time or 0.3, Enum.EasingStyle.Back)
+		lerpCFrame(lObj, lProp, lT, time or 0.3, Enum.EasingStyle.Back)
+	end)
+	if not ok then
+		warn("[Void] Kol pozu uygulanamadı:", err)
+	end
+end
+
+---------------------------------------------------------------------
+-- Sesler
+---------------------------------------------------------------------
+local function playSound(key, parent, idOverride)
+	local cfg = Config.Sounds and Config.Sounds[key]
+	local id = idOverride or (cfg and cfg.Id)
+	if not id or id == "" or not parent then
+		return nil
+	end
+	local snd = Instance.new("Sound")
+	snd.SoundId = id
+	snd.Volume = idOverride and 2 or (cfg and cfg.Volume or 1)
+	snd.PlaybackSpeed = (not idOverride and cfg and cfg.Speed) or 1
+	snd.Looped = (not idOverride and cfg and cfg.Looped) or false
+	snd.RollOffMaxDistance = 250
+	local reverb = Instance.new("ReverbSoundEffect")
+	reverb.DecayTime = 2.5
+	reverb.WetLevel = -4
+	reverb.Parent = snd
+	snd.Parent = parent
+	snd:Play()
+	if not snd.Looped then
+		Debris:AddItem(snd, 12)
+	end
+	return snd
+end
+
+---------------------------------------------------------------------
+-- Void formu: simsiyah beden, hafif beyaz gözler, gölge aurası
+---------------------------------------------------------------------
+local function clearVoidVisuals(char, state)
+	if state.eyes then
+		state.eyes:Destroy()
+		state.eyes = nil
+	end
+	if char then
+		for _, name in ipairs({ "VoidHighlight", "VoidAura", "VoidAura2" }) do
+			local obj = char:FindFirstChild(name, true)
+			while obj do
+				obj:Destroy()
+				obj = char:FindFirstChild(name, true)
+			end
+		end
+	end
+end
+
+local function applyVoidVisuals(player, char, state)
+	clearVoidVisuals(char, state)
+	local head = char:FindFirstChild("Head")
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not (head and root) then
+		return
+	end
+
+	-- Highlight ile tüm karakter (aksesuarlar dahil) simsiyah silüet olur
+	local hl = Instance.new("Highlight")
+	hl.Name = "VoidHighlight"
+	hl.FillColor = Config.ShadowColor
+	hl.FillTransparency = 1
+	hl.OutlineColor = Color3.fromRGB(25, 25, 32)
+	hl.OutlineTransparency = 1
+	hl.DepthMode = Enum.HighlightDepthMode.Occluded
+	hl.Parent = char
+	tween(hl, 0.8, { FillTransparency = 0, OutlineTransparency = 0.5 })
+
+	-- Gözler karakterin dışında bir klasörde (yoksa Highlight onları da siyah yapar)
+	local eyes = Instance.new("Folder")
+	eyes.Name = "VoidEyes_" .. player.Name
+	eyes.Parent = fxFolder
+	state.eyes = eyes
+
+	local z = -head.Size.Z / 2 - 0.03
+	for _, side in ipairs({ -1, 1 }) do
+		local eye = Instance.new("Part")
+		eye.Name = "Eye"
+		eye.Size = Vector3.new(0.2, 0.08, 0.05)
+		eye.Material = Enum.Material.Neon
+		eye.Color = Config.EyeColor
+		eye.Transparency = 1
+		eye.CanCollide = false
+		eye.CanQuery = false
+		eye.CanTouch = false
+		eye.Massless = true
+		eye.CastShadow = false
+		eye.CFrame = head.CFrame * CFrame.new(side * head.Size.X * 0.15, head.Size.Y * 0.08, z)
+			* CFrame.Angles(0, 0, math.rad(side * -8)) -- hafif çekik, sert bakış
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = head
+		weld.Part1 = eye
+		weld.Parent = eye
+		local light = Instance.new("PointLight")
+		light.Color = Config.EyeColor
+		light.Range = 3
+		light.Brightness = 0.6
+		light.Parent = eye
+		eye.Parent = eyes
+		tween(eye, 1.2, { Transparency = 0.15 })
+	end
+
+	-- Gövdeden yükselen siyah duman
+	local aura = makeSmoke(root, 18, 1.2, 4, 1.8, 2.5)
+	aura.Name = "VoidAura"
+	local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+	if torso then
+		local aura2 = makeSmoke(torso, 10, 0.6, 2, 1.2, 1)
+		aura2.Name = "VoidAura2"
+	end
+
+	-- Dönüşüm patlaması
+	local burst = makeSmoke(root, 0, 2, 7, 1.4, 14)
+	burst:Emit(45)
+	Debris:AddItem(burst, 2)
+	playSound("Transform", root)
+	fxRemote:FireAllClients("Transform", char)
+end
+
+local function setVoidForm(player, on)
+	local state = getState(player)
+	local char = player.Character
+	state.voidForm = on
+	if on and char then
+		applyVoidVisuals(player, char, state)
+	else
+		clearVoidVisuals(char, state)
+	end
+	player:SetAttribute("VoidForm", on)
+end
+
+---------------------------------------------------------------------
+-- Hedef bulma
+---------------------------------------------------------------------
+local function findHumanoidModel(part)
+	local model = part:FindFirstAncestorOfClass("Model")
+	while model do
+		local hum = model:FindFirstChildOfClass("Humanoid")
+		if hum then
+			return model, hum
+		end
+		model = model:FindFirstAncestorOfClass("Model")
+	end
+	return nil
+end
+
+local function findTargets(casterChar, origin, radius)
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { casterChar, fxFolder }
+	local found, list = {}, {}
+	for _, part in ipairs(workspace:GetPartBoundsInRadius(origin, radius, params)) do
+		local model, hum = findHumanoidModel(part)
+		if model and not found[model] and hum.Health > 0 and not model:GetAttribute("VoidMarked") then
+			local root = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or part
+			found[model] = true
+			table.insert(list, { model = model, hum = hum, root = root, dist = (root.Position - origin).Magnitude })
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.dist < b.dist
+	end)
+	return list
+end
+
+local function inCone(origin, dir, pos, angleDeg)
+	local to = pos - origin
+	if to.Magnitude < 0.1 then
+		return true
+	end
+	return dir:Dot(to.Unit) >= math.cos(math.rad(angleDeg))
+end
+
+---------------------------------------------------------------------
+-- Gölgeye dönüşüp duman olarak dağılma (ölüm efekti)
+---------------------------------------------------------------------
+local function shadowDissolve(model)
+	if model:GetAttribute("VoidDissolving") then
+		return
+	end
+	model:SetAttribute("VoidDissolving", true)
+	playSound("Dissolve", model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart"))
+
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			local drift = Vector3.new(math.random() - 0.5, 1.2 + math.random(), math.random() - 0.5) * 3
+			local smoke = makeSmoke(d, 0, 0.8, 3, 1.6, 3)
+			smoke:Emit(8)
+			tween(d, 1.8, { Transparency = 1, CFrame = d.CFrame + drift }, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+		elseif d:IsA("Decal") or d:IsA("Texture") then
+			tween(d, 1.2, { Transparency = 1 })
+		end
+	end
+	if not Players:GetPlayerFromCharacter(model) then
+		Debris:AddItem(model, 3)
+	end
+end
+
+-- Hedefi siyah gölgeye çevirir, hasar verir; ölürse duman olup dağılır.
+local function voidHit(target, damage, darkenTime)
+	local model, hum = target.model, target.hum
+	if model:GetAttribute("VoidMarked") then
+		return
+	end
+	model:SetAttribute("VoidMarked", true)
+
+	local hl = Instance.new("Highlight")
+	hl.Name = "VoidTargetHighlight"
+	hl.FillColor = Config.ShadowColor
+	hl.OutlineColor = Config.ShadowColor
+	hl.FillTransparency = 1
+	hl.OutlineTransparency = 1
+	hl.DepthMode = Enum.HighlightDepthMode.Occluded
+	hl.Parent = model
+	tween(hl, darkenTime, { FillTransparency = 0, OutlineTransparency = 0.3 })
+
+	local smoke = makeSmoke(target.root, 25, 1, 3.5, 1.4, 2)
+	task.delay(darkenTime, function()
+		if not model.Parent then
+			return
+		end
+		local willDie = hum.Health - damage <= 0
+		if willDie then
+			hum.BreakJointsOnDeath = false
+		end
+		hum:TakeDamage(damage)
+		if hum.Health <= 0 then
+			shadowDissolve(model)
+		else
+			-- hayatta kaldı: gölge yavaşça çekilsin
+			model:SetAttribute("VoidMarked", nil)
+			tween(hl, 0.8, { FillTransparency = 1, OutlineTransparency = 1 })
+			Debris:AddItem(hl, 0.9)
+			smoke.Enabled = false
+			Debris:AddItem(smoke, 2)
+			if target.unanchorOnSurvive and target.root.Parent then
+				target.root.Anchored = false
+			end
+		end
+	end)
+end
+
+---------------------------------------------------------------------
+-- Skiller
+---------------------------------------------------------------------
+local function rightHandAttachment(char)
+	local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+	if not hand then
+		return nil
+	end
+	local att = Instance.new("Attachment")
+	att.Position = Vector3.new(0, -hand.Size.Y / 2, 0)
+	att.Parent = hand
+	return att
+end
+
+local function doGrasp(player, char, root, dir)
+	local cfg = Config.Grasp
+	local target
+	for _, t in ipairs(findTargets(char, root.Position, cfg.Range)) do
+		if inCone(root.Position, dir, t.root.Position, cfg.ConeAngle) then
+			target = t
+			break
+		end
+	end
+
+	poseArms(char, "Reach", 0.2)
+	playSound("GraspCast", root)
+	task.delay(1.4, function()
+		poseArms(char, "Reset", 0.4)
+	end)
+	if not target then
+		return
+	end
+
+	-- Elden hedefe uzanan gölge dokunaçları
+	local a0 = rightHandAttachment(char)
+	local a1 = Instance.new("Attachment")
+	a1.Parent = target.root
+	if a0 then
+		for i = 1, 3 do
+			local beam = Instance.new("Beam")
+			beam.Attachment0 = a0
+			beam.Attachment1 = a1
+			beam.Color = ColorSequence.new(Config.ShadowColor)
+			beam.LightEmission = 0
+			beam.LightInfluence = 0
+			beam.FaceCamera = true
+			beam.Segments = 20
+			beam.Width0 = 0.9 - i * 0.2
+			beam.Width1 = 0.15
+			beam.CurveSize0 = (math.random() - 0.5) * 8
+			beam.CurveSize1 = (math.random() - 0.5) * 8
+			beam.Transparency = NumberSequence.new(0.05)
+			beam.Parent = a0
+			Debris:AddItem(beam, 1.6)
+		end
+		Debris:AddItem(a0, 1.7)
+	end
+	Debris:AddItem(a1, 1.7)
+
+	-- Hedefi havaya kaldırıp gölgeye çevir
+	if target.root:IsA("BasePart") then
+		target.unanchorOnSurvive = not target.root.Anchored
+		target.root.Anchored = true
+		tween(target.root, 1, { CFrame = target.root.CFrame + Vector3.new(0, 4, 0) }, Enum.EasingStyle.Sine)
+	end
+	playSound("GraspHit", target.root)
+	fxRemote:FireAllClients("Shake", root.Position, 0.4, 0.5)
+	voidHit(target, math.huge, 0.9)
+end
+
+local function doWave(player, char, root, dir)
+	local cfg = Config.Wave
+	poseArms(char, "Reach", 0.15)
+	playSound("Wave", root)
+	task.delay(1, function()
+		poseArms(char, "Reset", 0.4)
+	end)
+
+	local flatDir = Vector3.new(dir.X, 0, dir.Z)
+	flatDir = flatDir.Magnitude > 0.01 and flatDir.Unit or root.CFrame.LookVector
+
+	-- Görsel: ileri doğru ilerleyen gölge patlamaları
+	task.spawn(function()
+		for i = 1, 8 do
+			local pos = root.Position + dir * (i * cfg.Range / 8)
+			local size = 4 + i * 1.6
+			local ball = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 2, CFrame = CFrame.new(pos), Transparency = 0.25 })
+			tween(ball, 0.5, { Size = Vector3.one * size, Transparency = 1 })
+			local smoke = makeSmoke(ball, 0, 2, size * 0.7, 1.2, 6)
+			smoke:Emit(10)
+			Debris:AddItem(ball, 1.5)
+			task.wait(0.04)
+		end
+	end)
+	fxRemote:FireAllClients("Shake", root.Position, 0.6, 0.4)
+
+	for _, t in ipairs(findTargets(char, root.Position, cfg.Range)) do
+		if inCone(root.Position, dir, t.root.Position, cfg.ConeAngle) then
+			task.delay(t.dist / cfg.Range * 0.35, function()
+				voidHit(t, cfg.Damage, 0.25)
+			end)
+		end
+	end
+end
+
+local function showLine(head, text, duration)
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(10, 1.6)
+	gui.StudsOffset = Vector3.new(0, 3.2, 0)
+	gui.AlwaysOnTop = true
+	gui.LightInfluence = 0
+	gui.MaxDistance = 200
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.Antique
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(235, 240, 255)
+	label.TextStrokeColor3 = Color3.new(0, 0, 0)
+	label.TextStrokeTransparency = 0.2
+	label.Text = text
+	label.MaxVisibleGraphemes = 0
+	label.Parent = gui
+	gui.Parent = head
+	tween(label, math.min(1.2, duration * 0.5), { MaxVisibleGraphemes = #text }, Enum.EasingStyle.Linear)
+	task.delay(duration, function()
+		tween(label, 0.4, { TextTransparency = 1, TextStrokeTransparency = 1 })
+		Debris:AddItem(gui, 0.5)
+	end)
+end
+
+local function ultimateSequence(player, char, hum, root, state, ctx)
+	local cfg = Config.Ultimate
+	local startTime = workspace:GetServerTimeNow()
+	local startCF = root.CFrame
+	local head = char:FindFirstChild("Head")
+
+	-- Karakteri dondur, ölümsüz yap
+	local ff = Instance.new("ForceField")
+	ff.Visible = false
+	ff.Parent = char
+	ctx.ff = ff
+	root.Anchored = true
+	ctx.riseSound = playSound("UltRise", root)
+
+	cutsceneRemote:FireAllClients(char, startTime, cfg)
+
+	-- Replikler
+	for i, line in ipairs(cfg.Lines) do
+		local nextAt = cfg.Lines[i + 1] and cfg.Lines[i + 1].At or cfg.ImpactAt
+		task.delay(line.At, function()
+			if head and head.Parent then
+				showLine(head, line.Text, nextAt - line.At - 0.2)
+				playSound("UltLine", head)
+				if line.SoundId and line.SoundId ~= "" then
+					playSound("UltLine", head, line.SoundId)
+				end
+			end
+		end)
+	end
+
+	-- Yavaşça havaya yüksel ve süzül
+	local upCF = startCF + Vector3.new(0, cfg.RiseHeight, 0)
+	tween(root, cfg.ArmsOpenAt + 0.8, { CFrame = upCF }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	local floatAura = makeSmoke(root, 40, 2, 6, 2.2, 4)
+	ctx.floatAura = floatAura
+
+	task.wait(cfg.ArmsOpenAt)
+	poseArms(char, "Open", 1.2)
+	task.wait(0.8)
+
+	-- Havada hafif süzülme (aşağı yukarı)
+	ctx.floating = true
+	task.spawn(function()
+		local floatStart = os.clock()
+		while ctx.floating and root.Parent do
+			local t = os.clock() - floatStart
+			root.CFrame = upCF + Vector3.new(0, math.sin(t * 1.6) * 0.6, 0)
+			task.wait()
+		end
+	end)
+
+	task.wait(cfg.ImpactAt - cfg.ArmsOpenAt - 0.8)
+
+	-- ETKİ: büyük gölge küresi + herkes gölgeye dönüşür
+	local center = root.Position
+	local sphere = fxPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 4, CFrame = CFrame.new(center), Transparency = 0.15 })
+	tween(sphere, 1.4, { Size = Vector3.one * cfg.Radius * 2, Transparency = 1 }, Enum.EasingStyle.Quart)
+	Debris:AddItem(sphere, 1.6)
+	local ring = fxPart({
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, 6, 6),
+		CFrame = CFrame.new(center.X, startCF.Position.Y - 2.5, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Transparency = 0.2,
+	})
+	tween(ring, 1.6, { Size = Vector3.new(0.4, cfg.Radius * 2.2, cfg.Radius * 2.2), Transparency = 1 }, Enum.EasingStyle.Quart)
+	Debris:AddItem(ring, 1.8)
+	local burst = makeSmoke(sphere, 0, 4, 14, 2.5, 40)
+	burst:Emit(120)
+	playSound("UltImpact", root)
+	fxRemote:FireAllClients("Shake", center, 1.4, 1.2)
+
+	for _, t in ipairs(findTargets(char, center, cfg.Radius)) do
+		task.delay(0.15 + t.dist / cfg.Radius * 1.0, function()
+			voidHit(t, math.huge, 0.6)
+		end)
+	end
+
+	task.wait(cfg.EndAt - cfg.ImpactAt - 0.8)
+	ctx.floating = false
+	poseArms(char, "Reset", 0.8)
+	tween(root, 0.8, { CFrame = startCF }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+	task.wait(0.8)
+end
+
+-- Ne olursa olsun karakter havada donmuş kalmasın
+local function doUltimate(player, char, hum, root, state)
+	state.busy = true
+	local ctx = {}
+	local ok, err = pcall(ultimateSequence, player, char, hum, root, state, ctx)
+	if not ok then
+		warn("[Void] Ultimate hatası:", err)
+		poseArms(char, "Reset", 0.3)
+	end
+	ctx.floating = false
+	if ctx.floatAura then
+		ctx.floatAura.Enabled = false
+		Debris:AddItem(ctx.floatAura, 3)
+	end
+	if ctx.riseSound then
+		ctx.riseSound:Destroy()
+	end
+	if ctx.ff then
+		ctx.ff:Destroy()
+	end
+	if root.Parent then
+		root.Anchored = false
+	end
+	state.busy = false
+end
+
+---------------------------------------------------------------------
+-- İstek işleme
+---------------------------------------------------------------------
+abilityRemote.OnServerEvent:Connect(function(player, ability, aimDir)
+	if player:GetAttribute("SelectedCharacter") ~= "Sentry" then
+		return
+	end
+	local char, hum, root = getAlive(player)
+	if not char then
+		return
+	end
+	local state = getState(player)
+	if state.busy or typeof(ability) ~= "string" then
+		return
+	end
+
+	local cd = Config.Cooldowns[ability]
+	if not cd then
+		return
+	end
+	local now = os.clock()
+	if (state.cooldowns[ability] or 0) > now then
+		return
+	end
+
+	local dir = root.CFrame.LookVector
+	if typeof(aimDir) == "Vector3" and aimDir.Magnitude > 0.01 and aimDir.Magnitude < 2 then
+		dir = aimDir.Unit
+	end
+
+	if ability == "VoidForm" then
+		state.cooldowns[ability] = now + cd
+		setVoidForm(player, not state.voidForm)
+	elseif ability == "Grasp" then
+		state.cooldowns[ability] = now + cd
+		doGrasp(player, char, root, dir)
+	elseif ability == "Wave" then
+		state.cooldowns[ability] = now + cd
+		doWave(player, char, root, dir)
+	elseif ability == "Ultimate" then
+		if Config.Ultimate.RequiresVoidForm and not state.voidForm then
+			return
+		end
+		state.cooldowns[ability] = now + cd
+		task.spawn(doUltimate, player, char, hum, root, state)
+	end
+	fxRemote:FireClient(player, "Cooldown", ability, cd)
+end)
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(char)
+		local state = getState(player)
+		state.busy = false
+		clearVoidVisuals(nil, state)
+		state.voidForm = false
+		player:SetAttribute("VoidForm", false)
+		local hum = char:WaitForChild("Humanoid")
+		hum.Died:Connect(function()
+			clearVoidVisuals(nil, state)
+		end)
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	local s = states[player]
+	if s then
+		clearVoidVisuals(nil, s)
+	end
+	states[player] = nil
+end)
+
+print("[Void] VoidServer hazır")
+]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX13"><Properties><string name="Name">StarterPlayerScripts  ->  StarterPlayer > StarterPlayerScripts içine taşı</string></Properties><Item class="LocalScript" referent="RBX10"><Properties><string name="Name">CharacterSelectClient</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+-- Karakter seçim menüsü. Sol üstteki butona ya da M tuşuna basınca açılır.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+print("[Select] CharacterSelectClient başladı")
+local CharacterList = require(ReplicatedStorage:WaitForChild("CharacterList"))
+local remote = ReplicatedStorage:WaitForChild("SelectCharacter", 10)
+if not remote then
+	error("[Select] SelectCharacter yok -> CharacterSelectServer çalışmıyor (ServerScriptService'te Script olmalı)")
+end
+
+local player = Players.LocalPlayer
+local OPEN_KEY = Enum.KeyCode.M
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "CharacterSelect"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 10
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Açma butonu
+local openBtn = Instance.new("TextButton")
+openBtn.Position = UDim2.fromOffset(16, 70)
+openBtn.Size = UDim2.fromOffset(150, 40)
+openBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+openBtn.BackgroundTransparency = 0.15
+openBtn.Font = Enum.Font.GothamBold
+openBtn.TextSize = 16
+openBtn.TextColor3 = Color3.new(1, 1, 1)
+openBtn.Text = "Karakter Seç (M)"
+openBtn.Parent = gui
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(0, 8)
+
+-- Panel
+local shade = Instance.new("Frame")
+shade.Size = UDim2.fromScale(1, 1)
+shade.BackgroundColor3 = Color3.new(0, 0, 0)
+shade.BackgroundTransparency = 0.45
+shade.Visible = false
+shade.Parent = gui
+
+local panel = Instance.new("Frame")
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.fromScale(0.5, 0.5)
+panel.Size = UDim2.new(0, 760, 0, 380)
+panel.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+panel.Parent = shade
+Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 14)
+local sizeLimit = Instance.new("UISizeConstraint")
+sizeLimit.MaxSize = Vector2.new(760, 380)
+sizeLimit.Parent = panel
+
+local title = Instance.new("TextLabel")
+title.Position = UDim2.fromOffset(24, 14)
+title.Size = UDim2.new(1, -80, 0, 40)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 28
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Text = "KARAKTERİNİ SEÇ"
+title.Parent = panel
+
+local close = Instance.new("TextButton")
+close.AnchorPoint = Vector2.new(1, 0)
+close.Position = UDim2.new(1, -14, 0, 14)
+close.Size = UDim2.fromOffset(40, 40)
+close.BackgroundTransparency = 1
+close.Font = Enum.Font.GothamBlack
+close.TextSize = 24
+close.TextColor3 = Color3.fromRGB(180, 180, 190)
+close.Text = "X"
+close.Parent = panel
+
+local list = Instance.new("Frame")
+list.Position = UDim2.fromOffset(20, 70)
+list.Size = UDim2.new(1, -40, 1, -90)
+list.BackgroundTransparency = 1
+list.Parent = panel
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.Padding = UDim.new(0, 14)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Parent = list
+
+local cards = {}
+for i, c in ipairs(CharacterList) do
+	local card = Instance.new("Frame")
+	card.LayoutOrder = i
+	card.Size = UDim2.new(1 / #CharacterList, -10, 1, 0)
+	card.BackgroundColor3 = c.Color
+	card.Parent = list
+	Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
+	local stroke = Instance.new("UIStroke", card)
+	stroke.Color = c.Accent
+	stroke.Thickness = 2
+	stroke.Transparency = 0.8
+
+	local name = Instance.new("TextLabel")
+	name.Position = UDim2.fromOffset(14, 12)
+	name.Size = UDim2.new(1, -28, 0, 30)
+	name.BackgroundTransparency = 1
+	name.Font = Enum.Font.GothamBlack
+	name.TextScaled = true
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextColor3 = c.Accent
+	name.Text = c.Name
+	name.Parent = card
+
+	local desc = Instance.new("TextLabel")
+	desc.Position = UDim2.fromOffset(14, 50)
+	desc.Size = UDim2.new(1, -28, 0, 110)
+	desc.BackgroundTransparency = 1
+	desc.Font = Enum.Font.Gotham
+	desc.TextSize = 15
+	desc.TextWrapped = true
+	desc.TextXAlignment = Enum.TextXAlignment.Left
+	desc.TextYAlignment = Enum.TextYAlignment.Top
+	desc.TextColor3 = Color3.fromRGB(215, 215, 222)
+	desc.Text = c.Description
+	desc.Parent = card
+
+	local keys = Instance.new("TextLabel")
+	keys.Position = UDim2.new(0, 14, 1, -110)
+	keys.Size = UDim2.new(1, -28, 0, 44)
+	keys.BackgroundTransparency = 1
+	keys.Font = Enum.Font.GothamMedium
+	keys.TextSize = 13
+	keys.TextWrapped = true
+	keys.TextXAlignment = Enum.TextXAlignment.Left
+	keys.TextYAlignment = Enum.TextYAlignment.Top
+	keys.TextColor3 = Color3.fromRGB(160, 160, 170)
+	keys.Text = c.Keys
+	keys.Parent = card
+
+	local pick = Instance.new("TextButton")
+	pick.AnchorPoint = Vector2.new(0.5, 1)
+	pick.Position = UDim2.new(0.5, 0, 1, -12)
+	pick.Size = UDim2.new(1, -28, 0, 44)
+	pick.BackgroundColor3 = c.Accent
+	pick.Font = Enum.Font.GothamBlack
+	pick.TextSize = 18
+	pick.TextColor3 = Color3.fromRGB(10, 10, 12)
+	pick.Text = "SEÇ"
+	pick.Parent = card
+	Instance.new("UICorner", pick).CornerRadius = UDim.new(0, 8)
+
+	cards[c.Id] = { stroke = stroke, pick = pick }
+	pick.MouseButton1Click:Connect(function()
+		if player:GetAttribute("SelectedCharacter") == c.Id then
+			shade.Visible = false
+			return
+		end
+		remote:FireServer(c.Id)
+		shade.Visible = false
+	end)
+end
+
+local function refresh()
+	local current = player:GetAttribute("SelectedCharacter")
+	for id, card in pairs(cards) do
+		local selected = id == current
+		card.stroke.Transparency = selected and 0 or 0.8
+		card.pick.Text = selected and "SEÇİLİ" or "SEÇ"
+	end
+	local entry
+	for _, c in ipairs(CharacterList) do
+		if c.Id == current then
+			entry = c
+		end
+	end
+	openBtn.Text = (entry and entry.Name or "Karakter") .. " (M)"
+end
+
+local function toggle()
+	shade.Visible = not shade.Visible
+	if shade.Visible then
+		refresh()
+		panel.Size = UDim2.new(0, 700, 0, 350)
+		TweenService:Create(panel, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Size = UDim2.new(0, 760, 0, 380) }):Play()
+	end
+end
+
+openBtn.MouseButton1Click:Connect(toggle)
+close.MouseButton1Click:Connect(function()
+	shade.Visible = false
+end)
+UserInputService.InputBegan:Connect(function(input, processed)
+	if not processed and input.KeyCode == OPEN_KEY then
+		toggle()
+	end
+end)
+player:GetAttributeChangedSignal("SelectedCharacter"):Connect(refresh)
+refresh()
+
+-- İlk girişte menüyü otomatik aç
+task.delay(1, function()
+	local current = player:GetAttribute("SelectedCharacter")
+	if current == nil or current == "None" then
+		if not shade.Visible then
+			toggle()
+		end
+	end
+end)
+
+print("[Select] CharacterSelectClient hazır")
+]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX11"><Properties><string name="Name">KanekiClient</string><ProtectedString name="Source"><![CDATA[-- KanekiClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+-- Kagune dokunaçlarını (her Kaneki oyuncusu için) çizer ve canlandırır,
+-- kakugan (kırmızı göz), HUD, tuşlar ve kamera sarsıntısı.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+print("[Kaneki] KanekiClient başladı")
+local K = require(ReplicatedStorage:WaitForChild("KanekiConfig"))
+local remotes = ReplicatedStorage:WaitForChild("KanekiRemotes", 10)
+if not remotes then
+	error("[Kaneki] KanekiRemotes yok -> KanekiServer çalışmıyor (ServerScriptService'te Script olmalı)")
+end
+local abilityRemote = remotes:WaitForChild("Ability")
+local fxRemote = remotes:WaitForChild("Fx")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local function isKaneki()
+	return player:GetAttribute("SelectedCharacter") == "Kaneki"
+end
+
+local function tween(obj, time, props, style)
+	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad), props)
+	t:Play()
+	return t
+end
+
+---------------------------------------------------------------------
+-- HUD
+---------------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "KanekiHUD"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local bar = Instance.new("Frame")
+bar.AnchorPoint = Vector2.new(0.5, 1)
+bar.Position = UDim2.new(0.5, 0, 1, -20)
+bar.Size = UDim2.fromOffset(4 * 74, 64)
+bar.BackgroundTransparency = 1
+bar.Parent = gui
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Padding = UDim.new(0, 10)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = bar
+
+local slots = {}
+local function makeSlot(order, id, key, title)
+	local f = Instance.new("Frame")
+	f.LayoutOrder = order
+	f.Size = UDim2.fromOffset(64, 64)
+	f.BackgroundColor3 = Color3.fromRGB(20, 4, 6)
+	f.BackgroundTransparency = 0.15
+	f.ClipsDescendants = true
+	f.Parent = bar
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+	local stroke = Instance.new("UIStroke", f)
+	stroke.Color = K.Kagune.TipColor
+	stroke.Transparency = 0.6
+	local cd = Instance.new("Frame")
+	cd.AnchorPoint = Vector2.new(0, 1)
+	cd.Position = UDim2.fromScale(0, 1)
+	cd.Size = UDim2.fromScale(1, 0)
+	cd.BackgroundColor3 = Color3.new(0, 0, 0)
+	cd.BackgroundTransparency = 0.35
+	cd.BorderSizePixel = 0
+	cd.Parent = f
+	local k = Instance.new("TextLabel")
+	k.BackgroundTransparency = 1
+	k.Size = UDim2.new(1, 0, 0.55, 0)
+	k.Font = Enum.Font.GothamBlack
+	k.TextScaled = true
+	k.TextColor3 = Color3.fromRGB(255, 225, 225)
+	k.Text = key
+	k.Parent = f
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Position = UDim2.fromScale(0, 0.58)
+	t.Size = UDim2.new(1, 0, 0.32, 0)
+	t.Font = Enum.Font.GothamBold
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromRGB(190, 120, 125)
+	t.Text = title
+	t.Parent = f
+	slots[id] = { cd = cd, stroke = stroke }
+end
+makeSlot(1, "Kagune", K.Keys.Kagune.Name, "Kagune")
+makeSlot(2, "Strike", K.Keys.Strike.Name, "Saplama")
+makeSlot(3, "Flurry", K.Keys.Flurry.Name, "Fırtına")
+makeSlot(4, "Grab", K.Keys.Grab.Name, "Yakalama")
+
+local function refreshHUD()
+	bar.Visible = isKaneki()
+	local char = player.Character
+	local out = char and char:GetAttribute("KaguneOut") == true
+	slots.Kagune.stroke.Transparency = out and 0 or 0.6
+	slots.Kagune.stroke.Thickness = out and 2 or 1
+	for _, id in ipairs({ "Strike", "Flurry", "Grab" }) do
+		slots[id].stroke.Transparency = out and 0.3 or 0.9
+	end
+end
+player:GetAttributeChangedSignal("SelectedCharacter"):Connect(refreshHUD)
+
+---------------------------------------------------------------------
+-- Kamera sarsıntısı
+---------------------------------------------------------------------
+local shakeUntil, shakePower = 0, 0
+RunService:BindToRenderStep("KanekiShake", Enum.RenderPriority.Camera.Value + 3, function()
+	local now = os.clock()
+	if now < shakeUntil then
+		local p = shakePower * math.min(1, (shakeUntil - now) * 2)
+		camera.CFrame *= CFrame.Angles(
+			math.rad((math.random() - 0.5) * p * 2),
+			math.rad((math.random() - 0.5) * p * 2),
+			0
+		)
+	end
+end)
+
+---------------------------------------------------------------------
+-- Kagune çizimi
+---------------------------------------------------------------------
+-- Dokunaçlar belin arkasından çıkar. base: gövdeye göre çıkış noktası, dir: dinlenme yönü (arka = +Z)
+local TENTACLES = {
+	{ base = Vector3.new(-0.35, -0.55, 0.5), dir = Vector3.new(-1.1, 1.6, 1.4), len = 1.0, phase = 0.0 },
+	{ base = Vector3.new(0.35, -0.55, 0.5), dir = Vector3.new(1.1, 1.6, 1.4), len = 1.0, phase = 1.7 },
+	{ base = Vector3.new(-0.25, -0.8, 0.5), dir = Vector3.new(-1.8, 0.25, 1.1), len = 0.9, phase = 3.1 },
+	{ base = Vector3.new(0.25, -0.8, 0.5), dir = Vector3.new(1.8, 0.25, 1.1), len = 0.9, phase = 4.4 },
+}
+
+local renders = {} -- [character] = render
+local localFolder = Instance.new("Folder")
+localFolder.Name = "KaguneLocal"
+localFolder.Parent = workspace
+
+local function newPart(shape, color, material)
+	local p = Instance.new("Part")
+	p.Shape = shape
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = material or Enum.Material.Neon
+	p.Color = color
+	p.Size = Vector3.new(0.1, 0.1, 0.1)
+	p.Parent = localFolder
+	return p
+end
+
+local function createRender(char)
+	local r = { char = char, grow = 0, tentacles = {}, action = nil }
+	local n = K.Kagune.Segments
+	for i = 1, #TENTACLES do
+		local segs, joints = {}, {}
+		for s = 1, n do
+			local t = (s - 1) / (n - 1)
+			local color = K.Kagune.BaseColor:Lerp(K.Kagune.TipColor, t ^ 0.7)
+			-- Neon ile hafif parlayan, pul pul görünen dokunaç
+			segs[s] = newPart(Enum.PartType.Cylinder, color, (s % 3 == 0) and Enum.Material.Neon or Enum.Material.SmoothPlastic)
+			joints[s] = newPart(Enum.PartType.Ball, color, Enum.Material.Neon)
+		end
+		r.tentacles[i] = { segs = segs, joints = joints }
+	end
+	-- Kakugan: siyah göz akı + kırmızı iris (sol göz)
+	r.sclera = newPart(Enum.PartType.Block, Color3.new(0, 0, 0), Enum.Material.SmoothPlastic)
+	r.iris = newPart(Enum.PartType.Block, K.EyeColor, Enum.Material.Neon)
+	local light = Instance.new("PointLight")
+	light.Color = K.EyeColor
+	light.Range = 4
+	light.Brightness = 1.5
+	light.Parent = r.iris
+	r.light = Instance.new("PointLight")
+	r.light.Color = K.Kagune.TipColor
+	r.light.Range = 10
+	r.light.Brightness = 0
+	r.light.Parent = r.tentacles[1].joints[1]
+	renders[char] = r
+	return r
+end
+
+local function destroyRender(char)
+	local r = renders[char]
+	if not r then
+		return
+	end
+	for _, tent in ipairs(r.tentacles) do
+		for _, p in ipairs(tent.segs) do
+			p:Destroy()
+		end
+		for _, p in ipairs(tent.joints) do
+			p:Destroy()
+		end
+	end
+	r.sclera:Destroy()
+	r.iris:Destroy()
+	renders[char] = nil
+end
+
+local function bezier(a, b, c, t)
+	local u = 1 - t
+	return a * (u * u) + b * (2 * u * t) + c * (t * t)
+end
+
+local function smoothstep(x)
+	x = math.clamp(x, 0, 1)
+	return x * x * (3 - 2 * x)
+end
+
+-- Saldırı sırasında dokunaçların ne kadar hedefe uzandığı (0..1)
+local function actionAmount(action, now)
+	local e = now - action.start
+	if e < 0 or e > action.dur then
+		return 0
+	end
+	local inT = action.kind == "Strike" and 0.08 or 0.15
+	return smoothstep(e / inT) * smoothstep((action.dur - e) / 0.25)
+end
+
+local function hash(n)
+	return (math.sin(n * 12.9898) * 43758.5453) % 1
+end
+
+local function actionGoal(action, i, now, root, base)
+	if action.kind == "Strike" then
+		local off = Vector3.new(((i - 1) % 2) * 2 - 1, (i <= 2) and 0.6 or -0.6, 0) * 0.6
+		return action.target + off
+	elseif action.kind == "Grab" then
+		local tr = action.target
+		local p = (typeof(tr) == "Instance" and tr.Parent) and tr.Position or base
+		local a = i * math.pi / 2 + now * 5
+		return p + Vector3.new(math.cos(a) * 1.3, (i - 2.5) * 0.7, math.sin(a) * 1.3)
+	elseif action.kind == "Flurry" then
+		-- Her dokunaç farklı ritimde rastgele yönlere saplar
+		local beat = (now - action.start) / 0.18 + i * 0.5
+		local idx = math.floor(beat)
+		local ang = hash(idx * 7.13 + i * 3.7) * math.pi * 2
+		local h = hash(idx * 2.31 + i) * 3 - 1
+		local frac = beat - idx
+		local reach = 4 + math.sin(frac * math.pi) * 9
+		return root.Position + Vector3.new(math.cos(ang) * reach, h, math.sin(ang) * reach)
+	end
+	return base
+end
+
+local function updateRender(r, dt, now)
+	local char = r.char
+	local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+	local root = char:FindFirstChild("HumanoidRootPart")
+	local head = char:FindFirstChild("Head")
+	if not (char.Parent and torso and root) then
+		destroyRender(char)
+		return
+	end
+	local out = char:GetAttribute("KaguneOut") == true
+	if out then
+		r.grow = math.min(1, r.grow + dt / 0.45)
+	else
+		r.grow = math.max(0, r.grow - dt / 0.35)
+		if r.grow <= 0 then
+			destroyRender(char)
+			return
+		end
+	end
+	-- Açılırken hafif taşan (elastik) büyüme
+	local g = r.grow
+	local gScale = g < 1 and (1 - (1 - g) ^ 3) * (1 + 0.15 * math.sin(g * math.pi)) or 1
+
+	local tcf = torso.CFrame
+	local vel = root.AssemblyLinearVelocity
+	local trail = -Vector3.new(vel.X, 0, vel.Z) * 0.07
+	if trail.Magnitude > 4 then
+		trail = trail.Unit * 4
+	end
+	local moving = Vector3.new(vel.X, 0, vel.Z).Magnitude > 2
+	local action = r.action
+	if action and now - action.start > action.dur then
+		r.action = nil
+		action = nil
+	end
+
+	local n = K.Kagune.Segments
+	for i, def in ipairs(TENTACLES) do
+		local tent = r.tentacles[i]
+		local base = tcf:PointToWorldSpace(def.base)
+		local L = K.Kagune.Length * def.len * gScale
+		local restDir = tcf:VectorToWorldSpace(def.dir.Unit)
+		local ph = def.phase
+		-- Dururken yavaşça kıvrılan, yürürken arkada dalgalanan hareket
+		local swayAmp = moving and 0.7 or 1.5
+		local sway = tcf:VectorToWorldSpace(Vector3.new(
+			math.sin(now * 1.3 + ph) * swayAmp,
+			math.sin(now * 1.9 + ph * 1.3) * swayAmp * 0.8,
+			math.cos(now * 1.1 + ph) * swayAmp * 0.6
+		)) * gScale
+		local tip = base + restDir * L + sway + trail
+		local mid = base + restDir * L * 0.4 + sway * 0.35 + tcf:VectorToWorldSpace(Vector3.new(0, 1.6, 1.4)) * gScale
+
+		if action then
+			local amt = actionAmount(action, now)
+			if amt > 0 then
+				local goal = actionGoal(action, i, now, root, base)
+				local side = tcf.RightVector * (((i - 1) % 2) * 2 - 1) * 2.5
+				local goalMid = base:Lerp(goal, 0.45) + Vector3.new(0, 3, 0) + side
+				tip = tip:Lerp(goal, amt)
+				mid = mid:Lerp(goalMid, amt)
+			end
+		end
+
+		local prev = base
+		for s = 1, n do
+			local t = s / n
+			local p = bezier(base, mid, tip, t)
+			-- dalga: dokunaç boyunca küçük kıvrımlar
+			local wiggle = tcf:VectorToWorldSpace(Vector3.new(math.sin(now * 4 + t * 8 + ph), math.cos(now * 3.3 + t * 7 + ph), 0)) * 0.18 * t * gScale
+			p += wiggle
+			local w = (K.Kagune.BaseWidth + (K.Kagune.TipWidth - K.Kagune.BaseWidth) * t) * math.sqrt(math.max(g, 0.01))
+			local seg = tent.segs[s]
+			local joint = tent.joints[s]
+			local len = (p - prev).Magnitude
+			if len > 0.001 then
+				seg.Size = Vector3.new(len * 1.15, w, w)
+				seg.CFrame = CFrame.lookAt((prev + p) / 2, p) * CFrame.Angles(0, math.rad(90), 0)
+			end
+			joint.Size = Vector3.one * w * 1.08
+			joint.CFrame = CFrame.new(p)
+			prev = p
+		end
+	end
+	r.light.Brightness = 2 * g
+
+	-- Kakugan
+	if head and g > 0.2 then
+		local hs = head.Size
+		local eyeCF = head.CFrame * CFrame.new(-hs.X * 0.16, hs.Y * 0.08, -hs.Z / 2 - 0.02)
+		r.sclera.Size = Vector3.new(hs.X * 0.2, hs.Y * 0.11, 0.03)
+		r.sclera.CFrame = eyeCF
+		r.iris.Size = Vector3.new(hs.X * 0.08, hs.Y * 0.08, 0.03)
+		r.iris.CFrame = eyeCF * CFrame.new(0, 0, -0.012)
+		r.sclera.Transparency = 0
+		r.iris.Transparency = 0
+	else
+		r.sclera.Transparency = 1
+		r.iris.Transparency = 1
+	end
+end
+
+RunService.RenderStepped:Connect(function(dt)
+	local now = os.clock()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local char = plr.Character
+		if char and char:GetAttribute("KaguneOut") and not renders[char] then
+			createRender(char)
+		end
+	end
+	for char, r in pairs(renders) do
+		updateRender(r, dt, now)
+	end
+	if isKaneki() then
+		refreshHUD()
+	end
+end)
+
+---------------------------------------------------------------------
+-- Sunucudan gelen efektler
+---------------------------------------------------------------------
+local function myRoot()
+	local char = player.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+fxRemote.OnClientEvent:Connect(function(kind, a, b, c)
+	if kind == "Cooldown" then
+		local s = slots[a]
+		if s then
+			s.cd.Size = UDim2.fromScale(1, 1)
+			tween(s.cd, b, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Linear)
+		end
+	elseif kind == "Shake" then
+		local root = myRoot()
+		local dist = root and (root.Position - a).Magnitude or math.huge
+		local falloff = math.clamp(1 - dist / 100, 0, 1)
+		if falloff > 0 then
+			shakePower = b * falloff
+			shakeUntil = os.clock() + c
+		end
+	elseif kind == "Strike" or kind == "Flurry" or kind == "Grab" then
+		local char = a
+		local r = char and (renders[char] or (char:GetAttribute("KaguneOut") and createRender(char)))
+		if r then
+			local dur = (kind == "Flurry") and b or c
+			r.action = { kind = kind, start = os.clock(), dur = dur, target = (kind ~= "Flurry") and b or nil }
+		end
+	end
+end)
+
+---------------------------------------------------------------------
+-- Girdi
+---------------------------------------------------------------------
+local keyToAbility = {
+	[K.Keys.Kagune] = "Kagune",
+	[K.Keys.Strike] = "Strike",
+	[K.Keys.Flurry] = "Flurry",
+	[K.Keys.Grab] = "Grab",
+}
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or not isKaneki() then
+		return
+	end
+	local ability = keyToAbility[input.KeyCode]
+	if ability then
+		abilityRemote:FireServer(ability, camera.CFrame.LookVector)
+	end
+end)
+
+refreshHUD()
+print("[Kaneki] KanekiClient hazır")
+]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX12"><Properties><string name="Name">VoidClient</string><ProtectedString name="Source"><![CDATA[-- VoidClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+-- Girdi, uçuş, skill HUD'u, kamera sarsıntısı ve ultimate cutscene kamerası.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+
+print("[Void] VoidClient başladı")
+local configModule = ReplicatedStorage:WaitForChild("VoidConfig", 5)
+if not configModule or not configModule:IsA("ModuleScript") then
+	error("[Void] ReplicatedStorage içinde 'VoidConfig' adında bir ModuleScript bulunamadı!")
+end
+local Config = require(configModule)
+local remotes = ReplicatedStorage:WaitForChild("VoidRemotes", 10)
+if not remotes then
+	error("[Void] VoidRemotes yok -> VoidServer çalışmıyor. ServerScriptService içinde 'Script' olarak durduğundan emin ol.")
+end
+local abilityRemote = remotes:WaitForChild("Ability")
+local cutsceneRemote = remotes:WaitForChild("Cutscene")
+local fxRemote = remotes:WaitForChild("Fx")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+-- Hareket girdisi: varsa Roblox PlayerModule, yoksa WASD'yi kendimiz okuruz
+local controls
+do
+	local playerModule = player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 3)
+	if playerModule then
+		local ok, result = pcall(function()
+			return require(playerModule):GetControls()
+		end)
+		if ok then
+			controls = result
+		end
+	end
+end
+
+local function getMoveVector()
+	if controls then
+		local ok, mv = pcall(controls.GetMoveVector, controls)
+		if ok and mv then
+			return mv
+		end
+	end
+	local x, z = 0, 0
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+		z -= 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+		z += 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+		x -= 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+		x += 1
+	end
+	return Vector3.new(x, 0, z)
+end
+
+local inCutscene = false
+
+-- Bu güçler sadece karakter seçiminde "Sentry" seçiliyse çalışır
+local function isSentry()
+	return player:GetAttribute("SelectedCharacter") == "Sentry"
+end
+
+local function tween(obj, time, props, style, dir)
+	local t = TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
+	t:Play()
+	return t
+end
+
+---------------------------------------------------------------------
+-- HUD
+---------------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "VoidHUD"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local bar = Instance.new("Frame")
+bar.AnchorPoint = Vector2.new(0.5, 1)
+bar.Position = UDim2.new(0.5, 0, 1, -20)
+bar.Size = UDim2.fromOffset(5 * 74, 64)
+bar.BackgroundTransparency = 1
+bar.Parent = gui
+local layout = Instance.new("UIListLayout")
+layout.FillDirection = Enum.FillDirection.Horizontal
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Padding = UDim.new(0, 10)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = bar
+
+local slots = {}
+local function makeSlot(order, id, key, title)
+	local f = Instance.new("Frame")
+	f.LayoutOrder = order
+	f.Size = UDim2.fromOffset(64, 64)
+	f.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+	f.BackgroundTransparency = 0.2
+	f.ClipsDescendants = true
+	f.Parent = bar
+	Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+	local stroke = Instance.new("UIStroke", f)
+	stroke.Color = Color3.fromRGB(200, 210, 230)
+	stroke.Transparency = 0.7
+	local cd = Instance.new("Frame")
+	cd.Name = "CD"
+	cd.AnchorPoint = Vector2.new(0, 1)
+	cd.Position = UDim2.fromScale(0, 1)
+	cd.Size = UDim2.fromScale(1, 0)
+	cd.BackgroundColor3 = Color3.new(0, 0, 0)
+	cd.BackgroundTransparency = 0.35
+	cd.BorderSizePixel = 0
+	cd.Parent = f
+	local k = Instance.new("TextLabel")
+	k.BackgroundTransparency = 1
+	k.Size = UDim2.new(1, 0, 0.55, 0)
+	k.Font = Enum.Font.GothamBlack
+	k.TextScaled = true
+	k.TextColor3 = Color3.fromRGB(235, 240, 255)
+	k.Text = key
+	k.Parent = f
+	local t = Instance.new("TextLabel")
+	t.BackgroundTransparency = 1
+	t.Position = UDim2.fromScale(0, 0.58)
+	t.Size = UDim2.new(1, 0, 0.32, 0)
+	t.Font = Enum.Font.GothamBold
+	t.TextScaled = true
+	t.TextColor3 = Color3.fromRGB(150, 155, 170)
+	t.Text = title
+	t.Parent = f
+	slots[id] = { frame = f, cd = cd, stroke = stroke }
+end
+
+makeSlot(1, "Fly", Config.Keys.Fly.Name, "Uç")
+makeSlot(2, "VoidForm", Config.Keys.VoidForm.Name, "Void")
+makeSlot(3, "Grasp", Config.Keys.Grasp.Name, "Kavrayış")
+makeSlot(4, "Wave", Config.Keys.Wave.Name, "Dalga")
+makeSlot(5, "Ultimate", Config.Keys.Ultimate.Name, "Boşluk")
+
+local function setActive(id, on)
+	local s = slots[id]
+	if s then
+		tween(s.stroke, 0.2, { Transparency = on and 0 or 0.7, Thickness = on and 2 or 1 })
+	end
+end
+
+local function startCooldown(id, seconds)
+	local s = slots[id]
+	if not s then
+		return
+	end
+	s.cd.Size = UDim2.fromScale(1, 1)
+	tween(s.cd, seconds, { Size = UDim2.fromScale(1, 0) }, Enum.EasingStyle.Linear)
+end
+
+player:GetAttributeChangedSignal("VoidForm"):Connect(function()
+	setActive("VoidForm", player:GetAttribute("VoidForm") == true)
+end)
+
+---------------------------------------------------------------------
+-- Uçuş
+---------------------------------------------------------------------
+local flying = false
+local flyConn, linVel, alignOri, flyAtt
+
+local function stopFlying()
+	if not flying then
+		return
+	end
+	flying = false
+	if flyConn then
+		flyConn:Disconnect()
+		flyConn = nil
+	end
+	for _, obj in ipairs({ linVel, alignOri, flyAtt }) do
+		if obj then
+			obj:Destroy()
+		end
+	end
+	linVel, alignOri, flyAtt = nil, nil, nil
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum.PlatformStand = false
+		hum:ChangeState(Enum.HumanoidStateType.Freefall)
+	end
+	setActive("Fly", false)
+end
+
+local function startFlying()
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not (hum and root) or hum.Health <= 0 or root.Anchored then
+		return
+	end
+	flying = true
+	setActive("Fly", true)
+	hum.PlatformStand = true
+	local sc = Config.Sounds and Config.Sounds.Fly
+	if sc then
+		local snd = Instance.new("Sound")
+		snd.SoundId = sc.Id
+		snd.Volume = sc.Volume or 1
+		snd.PlaybackSpeed = sc.Speed or 1
+		snd.Parent = root
+		snd:Play()
+		game:GetService("Debris"):AddItem(snd, 5)
+	end
+
+	flyAtt = Instance.new("Attachment")
+	flyAtt.Name = "VoidFlyAttachment"
+	flyAtt.Parent = root
+
+	linVel = Instance.new("LinearVelocity")
+	linVel.Attachment0 = flyAtt
+	linVel.RelativeTo = Enum.ActuatorRelativeTo.World
+	linVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	linVel.MaxForce = math.huge
+	linVel.VectorVelocity = Vector3.zero
+	linVel.Parent = root
+
+	alignOri = Instance.new("AlignOrientation")
+	alignOri.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	alignOri.Attachment0 = flyAtt
+	alignOri.MaxTorque = math.huge
+	alignOri.Responsiveness = 18
+	alignOri.CFrame = root.CFrame.Rotation
+	alignOri.Parent = root
+
+	local velocity = Vector3.zero
+	local t = 0
+	flyConn = RunService.Heartbeat:Connect(function(dt)
+		if not root.Parent or hum.Health <= 0 then
+			stopFlying()
+			return
+		end
+		t += dt
+		local mv = getMoveVector()
+		local camCF = camera.CFrame
+		local dir = camCF:VectorToWorldSpace(Vector3.new(mv.X, 0, mv.Z))
+		local vertical = 0
+		if UserInputService:IsKeyDown(Config.Keys.FlyUp) then
+			vertical += 1
+		end
+		if UserInputService:IsKeyDown(Config.Keys.FlyDown) then
+			vertical -= 1
+		end
+		dir += Vector3.new(0, vertical, 0)
+		local moving = dir.Magnitude > 0.05
+		local speed = UserInputService:IsKeyDown(Config.Keys.FlyBoost) and Config.FlyBoostSpeed or Config.FlySpeed
+		local target = moving and dir.Unit * speed or Vector3.new(0, math.sin(t * 2) * 0.8, 0) -- dururken süzülme
+		velocity = velocity:Lerp(target, math.clamp(dt * 6, 0, 1))
+		linVel.VectorVelocity = velocity
+
+		-- Yön: kameraya bak, hızlanınca öne eğil
+		local flatLook = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
+		if flatLook.Magnitude < 0.01 then
+			flatLook = root.CFrame.LookVector
+		end
+		local facing = CFrame.lookAt(Vector3.zero, flatLook.Unit)
+		local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+		local forwardSpeed = horizontal:Dot(flatLook.Unit)
+		local tilt = math.clamp(forwardSpeed / Config.FlyBoostSpeed, -0.4, 1) * math.rad(55)
+		alignOri.CFrame = facing * CFrame.Angles(-tilt, 0, 0)
+	end)
+end
+
+---------------------------------------------------------------------
+-- Kamera sarsıntısı
+---------------------------------------------------------------------
+local shakeUntil, shakePower = 0, 0
+RunService:BindToRenderStep("VoidShake", Enum.RenderPriority.Camera.Value + 2, function()
+	local now = os.clock()
+	if now < shakeUntil then
+		local p = shakePower * math.min(1, shakeUntil - now) -- sönümlenen
+		camera.CFrame *= CFrame.Angles(
+			math.rad((math.random() - 0.5) * p * 2),
+			math.rad((math.random() - 0.5) * p * 2),
+			math.rad((math.random() - 0.5) * p)
+		)
+	end
+end)
+
+local function shake(power, duration)
+	shakePower = power
+	shakeUntil = os.clock() + duration
+end
+
+---------------------------------------------------------------------
+-- Ekran efektleri
+---------------------------------------------------------------------
+local cc = Instance.new("ColorCorrectionEffect")
+cc.Name = "VoidCC"
+cc.Parent = Lighting
+
+local function myRoot()
+	local char = player.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function distanceTo(pos)
+	local root = myRoot()
+	return root and (root.Position - pos).Magnitude or math.huge
+end
+
+fxRemote.OnClientEvent:Connect(function(kind, a, b, c)
+	if kind == "Cooldown" then
+		startCooldown(a, b)
+	elseif kind == "Shake" then
+		local dist = distanceTo(a)
+		local falloff = math.clamp(1 - dist / 120, 0, 1)
+		if falloff > 0 then
+			shake(b * falloff, c)
+		end
+	elseif kind == "Transform" then
+		local root = a and a:FindFirstChild("HumanoidRootPart")
+		if root and distanceTo(root.Position) < 80 then
+			cc.Contrast, cc.Saturation, cc.Brightness = 0.4, -0.8, -0.15
+			tween(cc, 1.2, { Contrast = 0, Saturation = 0, Brightness = 0 })
+			shake(0.6, 0.4)
+		end
+	end
+end)
+
+---------------------------------------------------------------------
+-- Ultimate cutscene
+---------------------------------------------------------------------
+local cine = Instance.new("Frame")
+cine.Size = UDim2.fromScale(1, 1)
+cine.BackgroundTransparency = 1
+cine.Visible = false
+cine.Parent = gui
+
+local function letterbox(anchorY)
+	local f = Instance.new("Frame")
+	f.AnchorPoint = Vector2.new(0, anchorY)
+	f.Position = UDim2.fromScale(0, anchorY)
+	f.Size = UDim2.fromScale(1, 0)
+	f.BackgroundColor3 = Color3.new(0, 0, 0)
+	f.BorderSizePixel = 0
+	f.Parent = cine
+	return f
+end
+local topBar, bottomBar = letterbox(0), letterbox(1)
+
+local subtitle = Instance.new("TextLabel")
+subtitle.AnchorPoint = Vector2.new(0.5, 1)
+subtitle.Position = UDim2.fromScale(0.5, 0.95)
+subtitle.Size = UDim2.fromScale(0.8, 0.06)
+subtitle.BackgroundTransparency = 1
+subtitle.Font = Enum.Font.Antique
+subtitle.TextScaled = true
+subtitle.TextColor3 = Color3.fromRGB(230, 235, 250)
+subtitle.TextStrokeTransparency = 0.4
+subtitle.Text = ""
+subtitle.ZIndex = 3
+subtitle.Parent = cine
+
+local flash = Instance.new("Frame")
+flash.Size = UDim2.fromScale(1, 1)
+flash.BackgroundColor3 = Color3.new(0, 0, 0)
+flash.BackgroundTransparency = 1
+flash.BorderSizePixel = 0
+flash.ZIndex = 5
+flash.Parent = cine
+
+local function easeInOut(x)
+	return -(math.cos(math.pi * math.clamp(x, 0, 1)) - 1) / 2
+end
+
+local function runCasterCamera(char, startTime, cfg)
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local startCF = root.CFrame
+	local look = Vector3.new(startCF.LookVector.X, 0, startCF.LookVector.Z).Unit
+	local right = look:Cross(Vector3.yAxis)
+	local riseEnd = cfg.ArmsOpenAt + 0.8
+	local line3 = cfg.Lines[3] and cfg.Lines[3].At or (cfg.ImpactAt - 1.8)
+
+	-- Kameranın takip ettiği nokta: sunucudaki yükselişin aynısı (titremesiz)
+	local function basePos(e)
+		local h = cfg.RiseHeight * easeInOut(e / riseEnd)
+		if e > riseEnd then
+			h += math.sin((e - riseEnd) * 1.6) * 0.6
+		end
+		if e > cfg.EndAt - 0.8 then
+			h *= 1 - easeInOut((e - (cfg.EndAt - 0.8)) / 0.8)
+		end
+		return startCF.Position + Vector3.new(0, h + 1.5, 0)
+	end
+
+	local shots = {
+		-- 1) Arkadan, aşağıdan silüet (gökyüzüne karşı yükseliş)
+		{ from = 0, to = riseEnd, fov = { 60, 55 }, fn = function(a, p)
+			local pos = p - look * (10 - a * 3) + right * 2.5 + Vector3.new(0, -5 + a * 2, 0)
+			return CFrame.lookAt(pos, p + Vector3.new(0, 2.5, 0))
+		end },
+		-- 2) Yüze yakın çekim, beyaz gözler, yavaş dönüş
+		{ from = riseEnd, to = line3, fov = { 45, 32 }, fn = function(a, p)
+			local ang = math.rad(-40 + a * 80)
+			local dir = CFrame.fromAxisAngle(Vector3.yAxis, ang):VectorToWorldSpace(look)
+			return CFrame.lookAt(p + dir * 6 + Vector3.new(0, 0.4, 0), p + Vector3.new(0, 0.3, 0))
+		end },
+		-- 3) Önden, aşağıdan kahraman açısı: kollar açık, havada süzülüyor
+		{ from = line3, to = cfg.ImpactAt, fov = { 50, 62 }, fn = function(a, p)
+			local pos = p + look * (18 + a * 4) + right * (a * 3 - 1.5) - Vector3.new(0, 11, 0)
+			return CFrame.lookAt(pos, p + Vector3.new(0, 1, 0))
+		end },
+		-- 4) Geniş, yukarıdan: herkes gölgeye dönüşüyor
+		{ from = cfg.ImpactAt, to = cfg.EndAt, fov = { 72, 80 }, fn = function(a, p)
+			local pos = p - look * (28 + a * 14) + Vector3.new(0, 16 + a * 8, 0)
+			return CFrame.lookAt(pos, startCF.Position - Vector3.new(0, 4, 0))
+		end },
+	}
+
+	camera.CameraType = Enum.CameraType.Scriptable
+	local impactDone = false
+	while true do
+		local e = workspace:GetServerTimeNow() - startTime
+		if e >= cfg.EndAt or not char.Parent then
+			break
+		end
+		local p = basePos(e)
+		for _, s in ipairs(shots) do
+			if e >= s.from and e < s.to then
+				local a = (e - s.from) / (s.to - s.from)
+				camera.CFrame = s.fn(easeInOut(a), p)
+				camera.FieldOfView = s.fov[1] + (s.fov[2] - s.fov[1]) * easeInOut(a)
+				break
+			end
+		end
+		if not impactDone and e >= cfg.ImpactAt then
+			impactDone = true
+			flash.BackgroundColor3 = Color3.new(1, 1, 1)
+			flash.BackgroundTransparency = 0.1
+			tween(flash, 0.6, { BackgroundTransparency = 1 })
+		end
+		RunService.RenderStepped:Wait()
+	end
+	camera.CameraType = Enum.CameraType.Custom
+	camera.FieldOfView = 70
+end
+
+local function showSubtitles(startTime, cfg)
+	for i, line in ipairs(cfg.Lines) do
+		local nextAt = cfg.Lines[i + 1] and cfg.Lines[i + 1].At or cfg.ImpactAt
+		local delayTime = line.At - (workspace:GetServerTimeNow() - startTime)
+		task.delay(math.max(0, delayTime), function()
+			if not inCutscene then
+				return
+			end
+			subtitle.Text = line.Text
+			subtitle.MaxVisibleGraphemes = 0
+			subtitle.TextTransparency = 0
+			tween(subtitle, 1, { MaxVisibleGraphemes = #line.Text }, Enum.EasingStyle.Linear)
+			task.delay(nextAt - line.At - 0.3, function()
+				tween(subtitle, 0.25, { TextTransparency = 1 })
+			end)
+		end)
+	end
+end
+
+cutsceneRemote.OnClientEvent:Connect(function(char, startTime, cfg)
+	local casterRoot = char and char:FindFirstChild("HumanoidRootPart")
+	if not casterRoot then
+		return
+	end
+	local isCaster = char == player.Character
+	local near = isCaster or distanceTo(casterRoot.Position) < cfg.Radius + 40
+	if not near then
+		return
+	end
+
+	-- Dünya kararır, renkler solar
+	tween(cc, 2.5, { Saturation = -0.85, Contrast = 0.35, Brightness = -0.12, TintColor = Color3.fromRGB(190, 195, 215) })
+	task.delay(cfg.ImpactAt - (workspace:GetServerTimeNow() - startTime), function()
+		cc.Brightness = -0.35
+		tween(cc, 0.8, { Brightness = -0.12 })
+	end)
+
+	if isCaster then
+		inCutscene = true
+		stopFlying()
+		bar.Visible = false
+		cine.Visible = true
+		subtitle.Text = ""
+		tween(topBar, 0.6, { Size = UDim2.fromScale(1, 0.12) })
+		tween(bottomBar, 0.6, { Size = UDim2.fromScale(1, 0.12) })
+		showSubtitles(startTime, cfg)
+		runCasterCamera(char, startTime, cfg)
+		tween(topBar, 0.5, { Size = UDim2.fromScale(1, 0) })
+		tween(bottomBar, 0.5, { Size = UDim2.fromScale(1, 0) })
+		task.delay(0.5, function()
+			cine.Visible = false
+			bar.Visible = isSentry()
+		end)
+		inCutscene = false
+	else
+		task.wait(math.max(0, cfg.EndAt - (workspace:GetServerTimeNow() - startTime)))
+	end
+	tween(cc, 1.2, { Saturation = 0, Contrast = 0, Brightness = 0, TintColor = Color3.new(1, 1, 1) })
+end)
+
+---------------------------------------------------------------------
+-- Girdi
+---------------------------------------------------------------------
+local keyToAbility = {
+	[Config.Keys.VoidForm] = "VoidForm",
+	[Config.Keys.Grasp] = "Grasp",
+	[Config.Keys.Wave] = "Wave",
+	[Config.Keys.Ultimate] = "Ultimate",
+}
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or inCutscene or not isSentry() then
+		return
+	end
+	if input.KeyCode == Config.Keys.Fly then
+		if flying then
+			stopFlying()
+		else
+			startFlying()
+		end
+		return
+	end
+	local ability = keyToAbility[input.KeyCode]
+	if ability then
+		abilityRemote:FireServer(ability, camera.CFrame.LookVector)
+	end
+end)
+
+player.CharacterAdded:Connect(function()
+	stopFlying()
+	flying = false
+	inCutscene = false
+	camera.CameraType = Enum.CameraType.Custom
+end)
+
+local function refreshSelection()
+	bar.Visible = isSentry() and not inCutscene
+	if not isSentry() then
+		stopFlying()
+	end
+end
+player:GetAttributeChangedSignal("SelectedCharacter"):Connect(refreshSelection)
+refreshSelection()
+
+print("[Void] VoidClient hazır - HUD altta görünmeli")
+]]></ProtectedString></Properties></Item></Item></Item></roblox>

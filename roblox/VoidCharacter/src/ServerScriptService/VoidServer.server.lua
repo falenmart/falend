@@ -693,6 +693,9 @@ end
 -- İstek işleme
 ---------------------------------------------------------------------
 abilityRemote.OnServerEvent:Connect(function(player, ability, aimDir)
+	if player:GetAttribute("SelectedCharacter") ~= "Sentry" then
+		return
+	end
 	local char, hum, root = getAlive(player)
 	if not char then
 		return

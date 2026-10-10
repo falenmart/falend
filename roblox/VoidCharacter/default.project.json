@@ -3,14 +3,41 @@
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
-      "VoidConfig": { "$path": "src/ReplicatedStorage/VoidConfig.lua" }
+      "CharacterList": {
+        "$path": "src/ReplicatedStorage/CharacterList.lua"
+      },
+      "KanekiConfig": {
+        "$path": "src/ReplicatedStorage/KanekiConfig.lua"
+      },
+      "RigPose": {
+        "$path": "src/ReplicatedStorage/RigPose.lua"
+      },
+      "VoidConfig": {
+        "$path": "src/ReplicatedStorage/VoidConfig.lua"
+      }
     },
     "ServerScriptService": {
-      "VoidServer": { "$path": "src/ServerScriptService/VoidServer.server.lua" }
+      "CharacterSelectServer": {
+        "$path": "src/ServerScriptService/CharacterSelectServer.server.lua"
+      },
+      "KanekiServer": {
+        "$path": "src/ServerScriptService/KanekiServer.server.lua"
+      },
+      "VoidServer": {
+        "$path": "src/ServerScriptService/VoidServer.server.lua"
+      }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "VoidClient": { "$path": "src/StarterPlayerScripts/VoidClient.client.lua" }
+        "CharacterSelectClient": {
+          "$path": "src/StarterPlayerScripts/CharacterSelectClient.client.lua"
+        },
+        "KanekiClient": {
+          "$path": "src/StarterPlayerScripts/KanekiClient.client.lua"
+        },
+        "VoidClient": {
+          "$path": "src/StarterPlayerScripts/VoidClient.client.lua"
+        }
       }
     }
   }

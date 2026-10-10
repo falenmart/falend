@@ -1,24 +1,24 @@
-# Void Karakteri (Roblox)
+# Karakter Paketi: Sentry (Void) + Ken Kaneki
 
-Sentry'nin "Void" formundan esinlenen karakter: uçma, simsiyah Void formu, el uzatarak kullanılan skiller ve cutscene'li ultimate.
+Karakter seçim menüsü (M tuşu / sol üst buton) ile güç seçilir. Seçince karakter ölür ve yeni güçle otomatik doğar.
 
-## Kurulum (Studio)
-| Dosya | Studio'da nereye | Tür |
+## En kolay kurulum: CharacterPack.rbxmx
+1. Studio'da Explorer'da **ServerStorage**'a sağ tıkla → **Insert from File...** → `CharacterPack.rbxmx`
+2. Açılan `CharacterPack` klasörünün içindeki 3 klasörün **içindekileri** yazan yerlere sürükle:
+   - `ReplicatedStorage -> ...` içindekiler → **ReplicatedStorage**
+   - `ServerScriptService -> ...` içindekiler → **ServerScriptService**
+   - `StarterPlayerScripts -> ...` içindekiler → **StarterPlayer > StarterPlayerScripts**
+3. Eski VoidConfig / VoidServer / VoidClient'ı sil (yenileri onların yerine geçer), boş `CharacterPack` klasörünü sil.
+
+## Dosyalar
+| Dosya | Yer | Tür |
 |---|---|---|
-| `src/ReplicatedStorage/VoidConfig.lua` | ReplicatedStorage → adı `VoidConfig` | **ModuleScript** |
-| `src/ServerScriptService/VoidServer.server.lua` | ServerScriptService → `VoidServer` | **Script** |
-| `src/StarterPlayerScripts/VoidClient.client.lua` | StarterPlayer → StarterPlayerScripts → `VoidClient` | **LocalScript** |
-
-Game Settings → Avatar → **R15** önerilir (R6 da çalışır). Rojo kullanıyorsan: `rojo serve`.
+| CharacterList, RigPose, VoidConfig, KanekiConfig | ReplicatedStorage | ModuleScript |
+| CharacterSelectServer, VoidServer, KanekiServer | ServerScriptService | Script |
+| CharacterSelectClient, VoidClient, KanekiClient | StarterPlayerScripts | LocalScript |
 
 ## Tuşlar
-| Tuş | Skill |
-|---|---|
-| F | Uç / in (Space yukarı, Ctrl aşağı, Shift hızlan) |
-| Z | Void formu: simsiyah beden, hafif beyaz gözler, siyah duman aurası |
-| X | Kavrayış: elini uzatır, öndeki hedefi gölge dokunaçlarıyla kaldırır, gölgeye çevirip öldürür |
-| C | Dalga: elini uzatır, önündeki koniye gölge dalgası (hasar, ölen duman olur) |
-| G | **Ultimate (Void formu gerekli):** cutscene, havaya yükselir, kollarını açar, replikleri söyler, çevresindeki herkes siyah gölge/duman olup ölür |
+**Sentry:** F uç · Z Void formu · X Kavrayış · C Dalga · G Boşluk (cutscene, Void formu gerekir)
 
-NPC'ler de hasar alır: içinde `Humanoid` olan her Model hedeftir.
-Replikler, süreler, hasar, menzil ve tuşlar `VoidConfig` içinden değiştirilebilir.
+**Kaneki:** E parmak kütlet + kagune aç/kapa · X Saplama · C Fırtına · V Yakalama (saldırılar için kagune açık olmalı)
+Kagune açıkken durursan dokunaçlar kıvrılır, ara sıra kendiliğinden parmak kütletir.
