@@ -24,7 +24,42 @@ local fxRemote = remotes:WaitForChild("Fx")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local controls = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+-- Hareket girdisi: varsa Roblox PlayerModule, yoksa WASD'yi kendimiz okuruz
+local controls
+do
+	local playerModule = player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 3)
+	if playerModule then
+		local ok, result = pcall(function()
+			return require(playerModule):GetControls()
+		end)
+		if ok then
+			controls = result
+		end
+	end
+end
+
+local function getMoveVector()
+	if controls then
+		local ok, mv = pcall(controls.GetMoveVector, controls)
+		if ok and mv then
+			return mv
+		end
+	end
+	local x, z = 0, 0
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+		z -= 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+		z += 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+		x -= 1
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
+		x += 1
+	end
+	return Vector3.new(x, 0, z)
+end
 
 local inCutscene = false
 
@@ -193,7 +228,7 @@ local function startFlying()
 			return
 		end
 		t += dt
-		local mv = controls:GetMoveVector()
+		local mv = getMoveVector()
 		local camCF = camera.CFrame
 		local dir = camCF:VectorToWorldSpace(Vector3.new(mv.X, 0, mv.Z))
 		local vertical = 0
