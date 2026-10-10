@@ -21,6 +21,23 @@ Hepsi **512x512, şeffaf arka planlı PNG**. Kalın koyu kontur sayesinde siyah,
 | `2_havali_smiley.png` | Meme / "cool" kitle. Küçük göründüğünde bile okunur. |
 | `3_good_vibes.png` | Aesthetic / pozitif kitle. İngilizce olduğu için tüm dünyaya satılır. |
 
+## Oyun temaları seri (en popüler Roblox oyunlarından esinlenen)
+![Oyun temaları 1](onizleme_oyunlar_1.png)
+![Oyun temaları 2](onizleme_oyunlar_2.png)
+
+| Dosya | Esinlendiği oyun | Önerilen başlık |
+|---|---|---|
+| `8_serif_yildizi.png` | Murder Mystery 2 (Şerif rolü) | `Sheriff Badge Gold Star T-Shirt` |
+| `9_gece_kampi.png` | 99 Nights in the Forest | `Night Survivor Campfire Forest T-Shirt` |
+| `10_sihirli_meyve.png` | Blox Fruits | `Magic Swirl Fruit Power T-Shirt` |
+| `11_catlayan_yumurta.png` | Adopt Me / Steal an Egg | `Cute Hatching Egg Pet T-Shirt` |
+| `12_acma_kapiyi.png` | Doors | `Don't Open The Door Scary Eyes T-Shirt` |
+| `13_rp_evi.png` | Brookhaven RP | `RP Life Cute House Roleplay T-Shirt` |
+
+**Dikkat:** Tasarımlarda oyun adı, logo veya karakter **yok**. Roblox, telifli içerik kullanan kıyafetleri reddeder ve hesaba uyarı verebilir. Başlıklara da oyun adı yazma: alakasız anahtar kelime eklemek Roblox kurallarına aykırı. Oyuncular temayı zaten tanır.
+
+Bu seriyi yeniden üretmek için `python3 oyun_temalari.py` komutunu çalıştır.
+
 ## 2026 kuralları (önemli)
 - Her T-shirt yüklemesi **10 Robux**. Tasarım reddedilirse para iade edilmez.
 - Satış yapmak için **Roblox Premium** gerekiyor.
