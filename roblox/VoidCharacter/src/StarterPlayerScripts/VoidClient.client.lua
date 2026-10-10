@@ -199,6 +199,16 @@ local function startFlying()
 	flying = true
 	setActive("Fly", true)
 	hum.PlatformStand = true
+	local sc = Config.Sounds and Config.Sounds.Fly
+	if sc then
+		local snd = Instance.new("Sound")
+		snd.SoundId = sc.Id
+		snd.Volume = sc.Volume or 1
+		snd.PlaybackSpeed = sc.Speed or 1
+		snd.Parent = root
+		snd:Play()
+		game:GetService("Debris"):AddItem(snd, 5)
+	end
 
 	flyAtt = Instance.new("Attachment")
 	flyAtt.Name = "VoidFlyAttachment"

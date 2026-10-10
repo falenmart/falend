@@ -50,11 +50,27 @@ Config.Ultimate = {
 	ImpactAt = 7.2,
 	EndAt = 10.5,
 	-- Repliklerin çıkış zamanı ve metni (istediğin gibi değiştir)
+	-- SoundId: kendi seslendirmeni Roblox'a yükleyip "rbxassetid://123..." olarak yaz (boş bırakılabilir)
 	Lines = {
-		{ At = 0.6, Text = "Herkes bir kahraman istedi..." },
-		{ At = 3.0, Text = "Ama ışığın da bir gölgesi vardır." },
-		{ At = 5.4, Text = "Ben Sentry değilim. Ben Boşluğum." },
+		{ At = 0.6, Text = "Herkes bir kahraman istedi...", SoundId = "" },
+		{ At = 3.0, Text = "Ama ışığın da bir gölgesi vardır.", SoundId = "" },
+		{ At = 5.4, Text = "Ben Sentry değilim. Ben Boşluğum.", SoundId = "" },
 	},
+}
+
+-- Ses efektleri
+-- Varsayılanlar Roblox'un içinde gelen sesler (her oyunda çalışır), kalın/karanlık olsun diye yavaşlatıldı.
+-- Daha iyi sesler için Toolbox > Audio'dan ses bulup Id'yi "rbxassetid://NUMARA" ile değiştir.
+Config.Sounds = {
+	Transform = { Id = "rbxasset://sounds/Rocket whoosh.wav", Volume = 1.2, Speed = 0.35 },
+	GraspCast = { Id = "rbxasset://sounds/swoosh.wav", Volume = 1, Speed = 0.55 },
+	GraspHit = { Id = "rbxasset://sounds/collide.wav", Volume = 1, Speed = 0.4 },
+	Wave = { Id = "rbxasset://sounds/Rocket whoosh.wav", Volume = 1.3, Speed = 0.6 },
+	Dissolve = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.7, Speed = 0.3 },
+	UltRise = { Id = "rbxasset://sounds/action_falling.mp3", Volume = 0.8, Speed = 0.5, Looped = true },
+	UltLine = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.5, Speed = 0.25 },
+	UltImpact = { Id = "rbxasset://sounds/collide.wav", Volume = 2.5, Speed = 0.22 },
+	Fly = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.8, Speed = 0.8 },
 }
 
 -- Görsel

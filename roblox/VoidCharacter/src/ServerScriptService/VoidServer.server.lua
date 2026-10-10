@@ -107,9 +107,11 @@ local function fxPart(props)
 end
 
 ---------------------------------------------------------------------
--- Kol pozları (Motor6D C0 tween) — R15 ve R6 destekli
+-- Kol pozları — Motor6D (C0) ve yeni AnimationConstraint eklemleri desteklenir
 ---------------------------------------------------------------------
-local originalC0 = setmetatable({}, { __mode = "k" })
+local RunService = game:GetService("RunService")
+local originalCF = setmetatable({}, { __mode = "k" })
+local activeLerp = setmetatable({}, { __mode = "k" })
 
 local function getShoulders(char)
 	local rua = char:FindFirstChild("RightUpperArm")
@@ -124,34 +126,112 @@ local function getShoulders(char)
 	return nil
 end
 
+-- Eklemin döndürülebilir kısmını bul: Motor6D -> C0, AnimationConstraint -> Attachment0.CFrame
+local function jointHandle(joint)
+	if not joint then
+		return nil
+	end
+	if joint:IsA("Motor6D") or joint:IsA("Weld") then
+		local ok = pcall(function()
+			joint.C0 = joint.C0
+		end)
+		if ok then
+			return joint, "C0"
+		end
+	end
+	local ok, att = pcall(function()
+		return joint.Attachment0
+	end)
+	if ok and att then
+		return att, "CFrame"
+	end
+	return nil
+end
+
+local function lerpCFrame(obj, prop, target, time, style)
+	local start = obj[prop]
+	local token = {}
+	activeLerp[obj] = token
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		if activeLerp[obj] ~= token or not obj.Parent then
+			conn:Disconnect()
+			return
+		end
+		local a = math.clamp((os.clock() - t0) / time, 0, 1)
+		local e = TweenService:GetValue(a, style, Enum.EasingDirection.Out)
+		pcall(function()
+			obj[prop] = start:Lerp(target, e)
+		end)
+		if a >= 1 then
+			conn:Disconnect()
+		end
+	end)
+end
+
 local function poseArms(char, pose, time)
-	local right, left, rig = getShoulders(char)
-	if not (right and left) then
-		return
-	end
-	originalC0[right] = originalC0[right] or right.C0
-	originalC0[left] = originalC0[left] or left.C0
-	local r0, l0 = originalC0[right], originalC0[left]
-	local rT, lT = r0, l0
-
-	if pose == "Open" then -- kolları iki yana aç
-		if rig == "R15" then
-			rT = r0 * CFrame.Angles(math.rad(15), 0, math.rad(80))
-			lT = l0 * CFrame.Angles(math.rad(15), 0, math.rad(-80))
-		else
-			rT = r0 * CFrame.Angles(math.rad(-80), 0, 0)
-			lT = l0 * CFrame.Angles(math.rad(-80), 0, 0)
+	local ok, err = pcall(function()
+		local rJoint, lJoint, rig = getShoulders(char)
+		local rObj, rProp = jointHandle(rJoint)
+		local lObj, lProp = jointHandle(lJoint)
+		if not (rObj and lObj) then
+			return
 		end
-	elseif pose == "Reach" then -- sağ eli öne uzat
-		if rig == "R15" then
-			rT = r0 * CFrame.Angles(math.rad(90), 0, 0)
-		else
-			rT = r0 * CFrame.Angles(0, 0, math.rad(90))
-		end
-	end
+		originalCF[rObj] = originalCF[rObj] or rObj[rProp]
+		originalCF[lObj] = originalCF[lObj] or lObj[lProp]
+		local r0, l0 = originalCF[rObj], originalCF[lObj]
+		local rT, lT = r0, l0
 
-	tween(right, time or 0.3, { C0 = rT }, Enum.EasingStyle.Back)
-	tween(left, time or 0.3, { C0 = lT }, Enum.EasingStyle.Back)
+		if pose == "Open" then -- kolları iki yana aç
+			if rig == "R15" then
+				rT = r0 * CFrame.Angles(math.rad(15), 0, math.rad(80))
+				lT = l0 * CFrame.Angles(math.rad(15), 0, math.rad(-80))
+			else
+				rT = r0 * CFrame.Angles(math.rad(-80), 0, 0)
+				lT = l0 * CFrame.Angles(math.rad(-80), 0, 0)
+			end
+		elseif pose == "Reach" then -- sağ eli öne uzat
+			if rig == "R15" then
+				rT = r0 * CFrame.Angles(math.rad(90), 0, 0)
+			else
+				rT = r0 * CFrame.Angles(0, 0, math.rad(90))
+			end
+		end
+
+		lerpCFrame(rObj, rProp, rT, time or 0.3, Enum.EasingStyle.Back)
+		lerpCFrame(lObj, lProp, lT, time or 0.3, Enum.EasingStyle.Back)
+	end)
+	if not ok then
+		warn("[Void] Kol pozu uygulanamadı:", err)
+	end
+end
+
+---------------------------------------------------------------------
+-- Sesler
+---------------------------------------------------------------------
+local function playSound(key, parent, idOverride)
+	local cfg = Config.Sounds and Config.Sounds[key]
+	local id = idOverride or (cfg and cfg.Id)
+	if not id or id == "" or not parent then
+		return nil
+	end
+	local snd = Instance.new("Sound")
+	snd.SoundId = id
+	snd.Volume = idOverride and 2 or (cfg and cfg.Volume or 1)
+	snd.PlaybackSpeed = (not idOverride and cfg and cfg.Speed) or 1
+	snd.Looped = (not idOverride and cfg and cfg.Looped) or false
+	snd.RollOffMaxDistance = 250
+	local reverb = Instance.new("ReverbSoundEffect")
+	reverb.DecayTime = 2.5
+	reverb.WetLevel = -4
+	reverb.Parent = snd
+	snd.Parent = parent
+	snd:Play()
+	if not snd.Looped then
+		Debris:AddItem(snd, 12)
+	end
+	return snd
 end
 
 ---------------------------------------------------------------------
@@ -239,6 +319,7 @@ local function applyVoidVisuals(player, char, state)
 	local burst = makeSmoke(root, 0, 2, 7, 1.4, 14)
 	burst:Emit(45)
 	Debris:AddItem(burst, 2)
+	playSound("Transform", root)
 	fxRemote:FireAllClients("Transform", char)
 end
 
@@ -304,6 +385,7 @@ local function shadowDissolve(model)
 		return
 	end
 	model:SetAttribute("VoidDissolving", true)
+	playSound("Dissolve", model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart"))
 
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
@@ -391,6 +473,7 @@ local function doGrasp(player, char, root, dir)
 	end
 
 	poseArms(char, "Reach", 0.2)
+	playSound("GraspCast", root)
 	task.delay(1.4, function()
 		poseArms(char, "Reset", 0.4)
 	end)
@@ -430,6 +513,7 @@ local function doGrasp(player, char, root, dir)
 		target.root.Anchored = true
 		tween(target.root, 1, { CFrame = target.root.CFrame + Vector3.new(0, 4, 0) }, Enum.EasingStyle.Sine)
 	end
+	playSound("GraspHit", target.root)
 	fxRemote:FireAllClients("Shake", root.Position, 0.4, 0.5)
 	voidHit(target, math.huge, 0.9)
 end
@@ -437,6 +521,7 @@ end
 local function doWave(player, char, root, dir)
 	local cfg = Config.Wave
 	poseArms(char, "Reach", 0.15)
+	playSound("Wave", root)
 	task.delay(1, function()
 		poseArms(char, "Reset", 0.4)
 	end)
@@ -494,9 +579,8 @@ local function showLine(head, text, duration)
 	end)
 end
 
-local function doUltimate(player, char, hum, root, state)
+local function ultimateSequence(player, char, hum, root, state, ctx)
 	local cfg = Config.Ultimate
-	state.busy = true
 	local startTime = workspace:GetServerTimeNow()
 	local startCF = root.CFrame
 	local head = char:FindFirstChild("Head")
@@ -505,7 +589,9 @@ local function doUltimate(player, char, hum, root, state)
 	local ff = Instance.new("ForceField")
 	ff.Visible = false
 	ff.Parent = char
+	ctx.ff = ff
 	root.Anchored = true
+	ctx.riseSound = playSound("UltRise", root)
 
 	cutsceneRemote:FireAllClients(char, startTime, cfg)
 
@@ -515,6 +601,10 @@ local function doUltimate(player, char, hum, root, state)
 		task.delay(line.At, function()
 			if head and head.Parent then
 				showLine(head, line.Text, nextAt - line.At - 0.2)
+				playSound("UltLine", head)
+				if line.SoundId and line.SoundId ~= "" then
+					playSound("UltLine", head, line.SoundId)
+				end
 			end
 		end)
 	end
@@ -523,16 +613,17 @@ local function doUltimate(player, char, hum, root, state)
 	local upCF = startCF + Vector3.new(0, cfg.RiseHeight, 0)
 	tween(root, cfg.ArmsOpenAt + 0.8, { CFrame = upCF }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 	local floatAura = makeSmoke(root, 40, 2, 6, 2.2, 4)
+	ctx.floatAura = floatAura
 
 	task.wait(cfg.ArmsOpenAt)
 	poseArms(char, "Open", 1.2)
 	task.wait(0.8)
 
 	-- Havada hafif süzülme (aşağı yukarı)
-	local floating = true
+	ctx.floating = true
 	task.spawn(function()
 		local floatStart = os.clock()
-		while floating and root.Parent do
+		while ctx.floating and root.Parent do
 			local t = os.clock() - floatStart
 			root.CFrame = upCF + Vector3.new(0, math.sin(t * 1.6) * 0.6, 0)
 			task.wait()
@@ -556,6 +647,7 @@ local function doUltimate(player, char, hum, root, state)
 	Debris:AddItem(ring, 1.8)
 	local burst = makeSmoke(sphere, 0, 4, 14, 2.5, 40)
 	burst:Emit(120)
+	playSound("UltImpact", root)
 	fxRemote:FireAllClients("Shake", center, 1.4, 1.2)
 
 	for _, t in ipairs(findTargets(char, center, cfg.Radius)) do
@@ -565,16 +657,35 @@ local function doUltimate(player, char, hum, root, state)
 	end
 
 	task.wait(cfg.EndAt - cfg.ImpactAt - 0.8)
-	floating = false
+	ctx.floating = false
 	poseArms(char, "Reset", 0.8)
 	tween(root, 0.8, { CFrame = startCF }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 	task.wait(0.8)
-	floatAura.Enabled = false
-	Debris:AddItem(floatAura, 3)
+end
+
+-- Ne olursa olsun karakter havada donmuş kalmasın
+local function doUltimate(player, char, hum, root, state)
+	state.busy = true
+	local ctx = {}
+	local ok, err = pcall(ultimateSequence, player, char, hum, root, state, ctx)
+	if not ok then
+		warn("[Void] Ultimate hatası:", err)
+		poseArms(char, "Reset", 0.3)
+	end
+	ctx.floating = false
+	if ctx.floatAura then
+		ctx.floatAura.Enabled = false
+		Debris:AddItem(ctx.floatAura, 3)
+	end
+	if ctx.riseSound then
+		ctx.riseSound:Destroy()
+	end
+	if ctx.ff then
+		ctx.ff:Destroy()
+	end
 	if root.Parent then
 		root.Anchored = false
 	end
-	ff:Destroy()
 	state.busy = false
 end
 
