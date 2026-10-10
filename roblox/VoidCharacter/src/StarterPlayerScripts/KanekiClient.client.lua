@@ -159,6 +159,42 @@ local function newPart(shape, color, material)
 	return p
 end
 
+-- Blender/OBJ mesh'leri: ReplicatedStorage > KaguneMeshes > Segment / Tip (MeshPart). Yoksa basit şekiller kullanılır.
+local meshFolder = ReplicatedStorage:FindFirstChild("KaguneMeshes")
+local function meshTemplate(name)
+	local m = meshFolder and meshFolder:FindFirstChild(name)
+	if m and m:IsA("BasePart") then
+		return m
+	end
+	if m then
+		return m:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+local segTemplate = meshTemplate("Segment")
+local tipTemplate = meshTemplate("Tip")
+if segTemplate then
+	print("[Kaneki] Kagune mesh'leri bulundu")
+end
+
+local function newMesh(template, color, material)
+	local p = template:Clone()
+	for _, d in ipairs(p:GetChildren()) do
+		if not d:IsA("SurfaceAppearance") and not d:IsA("SpecialMesh") then
+			d:Destroy()
+		end
+	end
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = material
+	p.Color = color
+	p.Parent = localFolder
+	return p
+end
+
 local function createRender(char)
 	local r = { char = char, grow = 0, tentacles = {}, action = nil }
 	local n = K.Kagune.Segments
@@ -168,8 +204,17 @@ local function createRender(char)
 			local t = (s - 1) / (n - 1)
 			local color = K.Kagune.BaseColor:Lerp(K.Kagune.TipColor, t ^ 0.7)
 			-- Neon ile hafif parlayan, pul pul görünen dokunaç
-			segs[s] = newPart(Enum.PartType.Cylinder, color, (s % 3 == 0) and Enum.Material.Neon or Enum.Material.SmoothPlastic)
-			joints[s] = newPart(Enum.PartType.Ball, color, Enum.Material.Neon)
+			local mat = (s % 3 == 0) and Enum.Material.Neon or Enum.Material.SmoothPlastic
+			if s == n and tipTemplate then
+				segs[s] = newMesh(tipTemplate, color, Enum.Material.Neon)
+			elseif segTemplate then
+				segs[s] = newMesh(segTemplate, color, mat)
+			else
+				segs[s] = newPart(Enum.PartType.Cylinder, color, mat)
+			end
+			if not segTemplate then
+				joints[s] = newPart(Enum.PartType.Ball, color, Enum.Material.Neon)
+			end
 		end
 		r.tentacles[i] = { segs = segs, joints = joints }
 	end
@@ -199,7 +244,7 @@ local function destroyRender(char)
 		for _, p in ipairs(tent.segs) do
 			p:Destroy()
 		end
-		for _, p in ipairs(tent.joints) do
+		for _, p in pairs(tent.joints) do
 			p:Destroy()
 		end
 	end
@@ -241,6 +286,14 @@ local function actionGoal(action, i, now, root, base)
 		local p = (typeof(tr) == "Instance" and tr.Parent) and tr.Position or base
 		local a = i * math.pi / 2 + now * 5
 		return p + Vector3.new(math.cos(a) * 1.3, (i - 2.5) * 0.7, math.sin(a) * 1.3)
+	elseif action.kind == "Swipe" then
+		-- Önde yatay savurma (sol tık)
+		local e = smoothstep((now - action.start) / (action.dur * 0.7))
+		local side = (action.combo % 2 == 1) and 1 or -1
+		local ang = math.rad(side * (75 - 150 * e))
+		local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
+		local dir = CFrame.fromAxisAngle(Vector3.yAxis, ang):VectorToWorldSpace(look)
+		return root.Position + dir * 8 + Vector3.new(0, 0.5 + (i - 2.5) * 0.3, 0)
 	elseif action.kind == "Flurry" then
 		-- Her dokunaç farklı ritimde rastgele yönlere saplar
 		local beat = (now - action.start) / 0.18 + i * 0.5
@@ -307,7 +360,7 @@ local function updateRender(r, dt, now)
 		local tip = base + restDir * L + sway + trail
 		local mid = base + restDir * L * 0.4 + sway * 0.35 + tcf:VectorToWorldSpace(Vector3.new(0, 1.6, 1.4)) * gScale
 
-		if action then
+		if action and (not action.only or action.only[i]) then
 			local amt = actionAmount(action, now)
 			if amt > 0 then
 				local goal = actionGoal(action, i, now, root, base)
@@ -330,11 +383,23 @@ local function updateRender(r, dt, now)
 			local joint = tent.joints[s]
 			local len = (p - prev).Magnitude
 			if len > 0.001 then
-				seg.Size = Vector3.new(len * 1.15, w, w)
-				seg.CFrame = CFrame.lookAt((prev + p) / 2, p) * CFrame.Angles(0, math.rad(90), 0)
+				local cf = CFrame.lookAt((prev + p) / 2, p) * CFrame.Angles(0, math.rad(90), 0)
+				if s == n and tipTemplate then
+					-- sivri uç: biraz daha uzun ve kalın, ileri taşan
+					seg.Size = Vector3.new(len * 2.4, w * 3, w * 3)
+					seg.CFrame = cf * CFrame.new(len * 0.7, 0, 0)
+				elseif segTemplate then
+					seg.Size = Vector3.new(len * 1.35, w * 1.15, w * 1.15)
+					seg.CFrame = cf
+				else
+					seg.Size = Vector3.new(len * 1.15, w, w)
+					seg.CFrame = cf
+				end
 			end
-			joint.Size = Vector3.one * w * 1.08
-			joint.CFrame = CFrame.new(p)
+			if joint then
+				joint.Size = Vector3.one * w * 1.08
+				joint.CFrame = CFrame.new(p)
+			end
 			prev = p
 		end
 	end
@@ -401,6 +466,16 @@ fxRemote.OnClientEvent:Connect(function(kind, a, b, c)
 		if r then
 			local dur = (kind == "Flurry") and b or c
 			r.action = { kind = kind, start = os.clock(), dur = dur, target = (kind ~= "Flurry") and b or nil }
+		end
+	elseif kind == "Swipe" then
+		local char, combo = a, b
+		local r = char and renders[char]
+		if r then
+			local only = (combo % 2 == 1) and { [1] = true, [3] = true } or { [2] = true, [4] = true }
+			if combo >= 4 then
+				only = nil -- son vuruşta dört dokunaç birden
+			end
+			r.action = { kind = "Swipe", start = os.clock(), dur = 0.4, combo = combo, only = only }
 		end
 	end
 end)

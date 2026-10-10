@@ -1,4 +1,4 @@
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Folder" referent="RBX14"><Properties><string name="Name">CharacterPack</string></Properties><Item class="Folder" referent="RBX5"><Properties><string name="Name">ReplicatedStorage  ->  ReplicatedStorage içine taşı</string></Properties><Item class="ModuleScript" referent="RBX1"><Properties><string name="Name">CharacterList</string><ProtectedString name="Source"><![CDATA[-- CharacterList (ModuleScript) -> ReplicatedStorage
+<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" version="4"><Item class="Folder" referent="RBX16"><Properties><string name="Name">CharacterPack</string></Properties><Item class="Folder" referent="RBX5"><Properties><string name="Name">ReplicatedStorage  ->  ReplicatedStorage içine taşı</string></Properties><Item class="ModuleScript" referent="RBX1"><Properties><string name="Name">CharacterList</string><ProtectedString name="Source"><![CDATA[-- CharacterList (ModuleScript) -> ReplicatedStorage
 -- Seçim menüsündeki karakterler. Yeni karakter eklemek için buraya bir satır ekle.
 
 return {
@@ -257,7 +257,7 @@ Config.EyeColor = Color3.fromRGB(235, 245, 255)
 Config.ShadowColor = Color3.fromRGB(5, 5, 8)
 
 return Config
-]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX9"><Properties><string name="Name">ServerScriptService  ->  ServerScriptService içine taşı</string></Properties><Item class="Script" referent="RBX6"><Properties><string name="Name">CharacterSelectServer</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectServer (Script) -> ServerScriptService
+]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX10"><Properties><string name="Name">ServerScriptService  ->  ServerScriptService içine taşı</string></Properties><Item class="Script" referent="RBX6"><Properties><string name="Name">CharacterSelectServer</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectServer (Script) -> ServerScriptService
 -- Oyuncu menüden karakter seçince: seçimi kaydeder, oyuncuyu öldürür ve otomatik yeniden doğurur.
 
 local Players = game:GetService("Players")
@@ -322,7 +322,216 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 print("[Select] CharacterSelectServer hazır")
-]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX7"><Properties><string name="Name">KanekiServer</string><ProtectedString name="Source"><![CDATA[-- KanekiServer (Script) -> ServerScriptService
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX7"><Properties><string name="Name">CombatServer</string><ProtectedString name="Source"><![CDATA[-- CombatServer (Script) -> ServerScriptService
+-- Sol tık kombo: 4 vuruşluk düz vuruşlar (yumruk). Kaneki'de kagune açıksa dokunaçla savurur,
+-- Sentry Void formundaysa vuruşlar gölge dumanı bırakır.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+
+print("[Combat] CombatServer başladı")
+if not ReplicatedStorage:WaitForChild("RigPose", 5) then
+	error("[Combat] ReplicatedStorage içinde 'RigPose' ModuleScript'i yok!")
+end
+local RigPose = require(ReplicatedStorage.RigPose)
+
+local SETTINGS = {
+	Cooldown = 0.32,     -- vuruşlar arası
+	ComboReset = 1.0,    -- bu kadar vurmazsan kombo sıfırlanır
+	FinisherCooldown = 0.9,
+	Damage = 7,
+	FinisherDamage = 14,
+	Range = 5.5,
+	KaguneDamage = 11,
+	KaguneFinisherDamage = 20,
+	KaguneRange = 10,
+	Knockback = 45,
+}
+
+local SOUNDS = {
+	Swing = { Id = "rbxasset://sounds/swoosh.wav", Volume = 0.8, Speed = 1.4 },
+	Hit = { Id = "rbxasset://sounds/collide.wav", Volume = 0.9, Speed = 1.2 },
+	Finisher = { Id = "rbxasset://sounds/collide.wav", Volume = 1.4, Speed = 0.7 },
+}
+
+local remote = Instance.new("RemoteEvent")
+remote.Name = "CombatM1"
+remote.Parent = ReplicatedStorage
+
+local fxFolder = Instance.new("Folder")
+fxFolder.Name = "CombatFx"
+fxFolder.Parent = workspace
+
+local states = {}
+
+local function playSound(key, parent)
+	local cfg = SOUNDS[key]
+	if not parent then
+		return
+	end
+	local snd = Instance.new("Sound")
+	snd.SoundId = cfg.Id
+	snd.Volume = cfg.Volume
+	snd.PlaybackSpeed = cfg.Speed * (0.92 + math.random() * 0.16)
+	snd.RollOffMaxDistance = 120
+	snd.Parent = parent
+	snd:Play()
+	Debris:AddItem(snd, 4)
+end
+
+local function hitFx(pos, color, smoke)
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Transparency = 1
+	p.Size = Vector3.one
+	p.CFrame = CFrame.new(pos)
+	p.Parent = fxFolder
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = smoke and "rbxasset://textures/particles/smoke_main.dds" or "rbxasset://textures/particles/sparkles_main.dds"
+	e.Color = ColorSequence.new(color)
+	e.LightEmission = smoke and 0 or 0.7
+	e.LightInfluence = smoke and 0 or 1
+	e.Size = smoke and NumberSequence.new(1, 3) or NumberSequence.new(0.4, 0)
+	e.Transparency = NumberSequence.new(smoke and 0.3 or 0, 1)
+	e.Speed = NumberRange.new(smoke and 3 or 10, smoke and 8 or 18)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Lifetime = NumberRange.new(0.25, smoke and 0.8 or 0.4)
+	e.Rate = 0
+	e.Parent = p
+	e:Emit(smoke and 12 or 15)
+	Debris:AddItem(p, 1.2)
+end
+
+local function findHumanoidModel(part)
+	local model = part:FindFirstAncestorOfClass("Model")
+	while model do
+		local hum = model:FindFirstChildOfClass("Humanoid")
+		if hum then
+			return model, hum
+		end
+		model = model:FindFirstAncestorOfClass("Model")
+	end
+	return nil
+end
+
+-- Önündeki kutuda vurulacakları bul
+local function hitbox(char, root, range)
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { char, fxFolder }
+	local cf = root.CFrame * CFrame.new(0, 0, -range / 2 - 0.5)
+	local found, list = {}, {}
+	for _, part in ipairs(workspace:GetPartBoundsInBox(cf, Vector3.new(range * 0.9, 6, range), params)) do
+		local model, hum = findHumanoidModel(part)
+		if model and not found[model] and hum.Health > 0 then
+			found[model] = true
+			table.insert(list, { model = model, hum = hum, root = model:FindFirstChild("HumanoidRootPart") or part })
+		end
+	end
+	return list
+end
+
+-- Yumruk pozları (sağ-sol-sağ-son vuruş)
+local PUNCH = {
+	{ RightShoulder = CFrame.Angles(math.rad(90), 0, 0), Waist = CFrame.Angles(0, math.rad(20), 0) },
+	{ LeftShoulder = CFrame.Angles(math.rad(90), 0, 0), Waist = CFrame.Angles(0, math.rad(-20), 0) },
+	{ RightShoulder = CFrame.Angles(math.rad(70), 0, math.rad(30)), Waist = CFrame.Angles(0, math.rad(30), 0) },
+	{ RightShoulder = CFrame.Angles(math.rad(160), 0, 0), Waist = CFrame.Angles(math.rad(-15), 0, 0) },
+}
+
+remote.OnServerEvent:Connect(function(player)
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if not (hum and root) or hum.Health <= 0 or root.Anchored then
+		return
+	end
+	local s = states[player]
+	if not s then
+		s = { last = 0, combo = 0, nextAllowed = 0 }
+		states[player] = s
+	end
+	local now = os.clock()
+	if now < s.nextAllowed then
+		return
+	end
+	if now - s.last > SETTINGS.ComboReset then
+		s.combo = 0
+	end
+	s.combo = s.combo % 4 + 1
+	s.last = now
+	local finisher = s.combo == 4
+	s.nextAllowed = now + (finisher and SETTINGS.FinisherCooldown or SETTINGS.Cooldown)
+
+	local selected = player:GetAttribute("SelectedCharacter")
+	local kagune = selected == "Kaneki" and char:GetAttribute("KaguneOut") == true
+	local voidForm = selected == "Sentry" and player:GetAttribute("VoidForm") == true
+
+	playSound("Swing", root)
+	if kagune then
+		-- Kaneki: dokunaçla savurma (görseli KanekiClient çizer)
+		local kr = ReplicatedStorage:FindFirstChild("KanekiRemotes")
+		local fx = kr and kr:FindFirstChild("Fx")
+		if fx then
+			fx:FireAllClients("Swipe", char, s.combo)
+		end
+	else
+		local pose = PUNCH[s.combo]
+		RigPose.set(char, pose, 0.07, Enum.EasingStyle.Quad)
+		task.delay(finisher and 0.35 or 0.2, function()
+			if char.Parent then
+				local reset = {}
+				for k in pairs(pose) do
+					reset[k] = CFrame.identity
+				end
+				RigPose.set(char, reset, 0.15)
+			end
+		end)
+	end
+
+	local range = kagune and SETTINGS.KaguneRange or SETTINGS.Range
+	local dmg
+	if kagune then
+		dmg = finisher and SETTINGS.KaguneFinisherDamage or SETTINGS.KaguneDamage
+	else
+		dmg = finisher and SETTINGS.FinisherDamage or SETTINGS.Damage
+	end
+
+	task.delay(0.08, function()
+		if not root.Parent then
+			return
+		end
+		for _, t in ipairs(hitbox(char, root, range)) do
+			t.hum:TakeDamage(dmg)
+			local pos = t.root.Position
+			if kagune then
+				hitFx(pos, Color3.fromRGB(220, 20, 35), false)
+			elseif voidForm then
+				hitFx(pos, Color3.fromRGB(5, 5, 8), true)
+			else
+				hitFx(pos, Color3.fromRGB(255, 240, 200), false)
+			end
+			playSound(finisher and "Finisher" or "Hit", t.root)
+			if t.root:IsA("BasePart") and not t.root.Anchored then
+				local dir = (pos - root.Position) * Vector3.new(1, 0, 1)
+				dir = dir.Magnitude > 0.1 and dir.Unit or root.CFrame.LookVector
+				local power = finisher and SETTINGS.Knockback or 6
+				t.root.AssemblyLinearVelocity = dir * power + Vector3.new(0, finisher and 20 or 0, 0)
+			end
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	states[player] = nil
+end)
+
+print("[Combat] CombatServer hazır")
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX8"><Properties><string name="Name">KanekiServer</string><ProtectedString name="Source"><![CDATA[-- KanekiServer (Script) -> ServerScriptService
 -- Kaneki: parmak kütletme animasyonu, kagune aç/kapa, saldırılar ve hasar.
 -- Kagune dokunaçlarının kendisi her oyuncunun ekranında (KanekiClient) çizilir; burası mantığı yönetir.
 
@@ -740,7 +949,7 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 print("[Kaneki] KanekiServer hazır")
-]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX8"><Properties><string name="Name">VoidServer</string><ProtectedString name="Source"><![CDATA[-- VoidServer (Script) -> ServerScriptService
+]]></ProtectedString></Properties></Item><Item class="Script" referent="RBX9"><Properties><string name="Name">VoidServer</string><ProtectedString name="Source"><![CDATA[-- VoidServer (Script) -> ServerScriptService
 -- Void karakterinin sunucu tarafı: skill doğrulama, cooldown, hasar, gölge ölüm efekti,
 -- Void formu (simsiyah beden + beyaz gözler) ve ultimate cutscene akışı.
 
@@ -1503,7 +1712,7 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 print("[Void] VoidServer hazır")
-]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX13"><Properties><string name="Name">StarterPlayerScripts  ->  StarterPlayer > StarterPlayerScripts içine taşı</string></Properties><Item class="LocalScript" referent="RBX10"><Properties><string name="Name">CharacterSelectClient</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+]]></ProtectedString></Properties></Item></Item><Item class="Folder" referent="RBX15"><Properties><string name="Name">StarterPlayerScripts  ->  StarterPlayer > StarterPlayerScripts içine taşı</string></Properties><Item class="LocalScript" referent="RBX11"><Properties><string name="Name">CharacterSelectClient</string><ProtectedString name="Source"><![CDATA[-- CharacterSelectClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
 -- Karakter seçim menüsü. Sol üstteki butona ya da M tuşuna basınca açılır.
 
 local Players = game:GetService("Players")
@@ -1713,7 +1922,59 @@ task.delay(1, function()
 end)
 
 print("[Select] CharacterSelectClient hazır")
-]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX11"><Properties><string name="Name">KanekiClient</string><ProtectedString name="Source"><![CDATA[-- KanekiClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX12"><Properties><string name="Name">CombatClient</string><ProtectedString name="Source"><![CDATA[-- CombatClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+-- Sol tık = düz vuruş (basılı tutarsan art arda vurur).
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+print("[Combat] CombatClient başladı")
+local remote = ReplicatedStorage:WaitForChild("CombatM1", 10)
+if not remote then
+	error("[Combat] CombatM1 yok -> CombatServer çalışmıyor (ServerScriptService'te Script olmalı)")
+end
+
+local player = Players.LocalPlayer
+local holding = false
+local holdId = 0
+
+local function attack()
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.Health > 0 then
+		remote:FireServer()
+	end
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		holding = true
+		holdId += 1
+		local myId = holdId
+		attack()
+		task.spawn(function()
+			while holding and holdId == myId do
+				task.wait(0.34)
+				if holding and holdId == myId then
+					attack()
+				end
+			end
+		end)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		holding = false
+	end
+end)
+
+print("[Combat] CombatClient hazır")
+]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX13"><Properties><string name="Name">KanekiClient</string><ProtectedString name="Source"><![CDATA[-- KanekiClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
 -- Kagune dokunaçlarını (her Kaneki oyuncusu için) çizer ve canlandırır,
 -- kakugan (kırmızı göz), HUD, tuşlar ve kamera sarsıntısı.
 
@@ -1874,6 +2135,42 @@ local function newPart(shape, color, material)
 	return p
 end
 
+-- Blender/OBJ mesh'leri: ReplicatedStorage > KaguneMeshes > Segment / Tip (MeshPart). Yoksa basit şekiller kullanılır.
+local meshFolder = ReplicatedStorage:FindFirstChild("KaguneMeshes")
+local function meshTemplate(name)
+	local m = meshFolder and meshFolder:FindFirstChild(name)
+	if m and m:IsA("BasePart") then
+		return m
+	end
+	if m then
+		return m:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+local segTemplate = meshTemplate("Segment")
+local tipTemplate = meshTemplate("Tip")
+if segTemplate then
+	print("[Kaneki] Kagune mesh'leri bulundu")
+end
+
+local function newMesh(template, color, material)
+	local p = template:Clone()
+	for _, d in ipairs(p:GetChildren()) do
+		if not d:IsA("SurfaceAppearance") and not d:IsA("SpecialMesh") then
+			d:Destroy()
+		end
+	end
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = material
+	p.Color = color
+	p.Parent = localFolder
+	return p
+end
+
 local function createRender(char)
 	local r = { char = char, grow = 0, tentacles = {}, action = nil }
 	local n = K.Kagune.Segments
@@ -1883,8 +2180,17 @@ local function createRender(char)
 			local t = (s - 1) / (n - 1)
 			local color = K.Kagune.BaseColor:Lerp(K.Kagune.TipColor, t ^ 0.7)
 			-- Neon ile hafif parlayan, pul pul görünen dokunaç
-			segs[s] = newPart(Enum.PartType.Cylinder, color, (s % 3 == 0) and Enum.Material.Neon or Enum.Material.SmoothPlastic)
-			joints[s] = newPart(Enum.PartType.Ball, color, Enum.Material.Neon)
+			local mat = (s % 3 == 0) and Enum.Material.Neon or Enum.Material.SmoothPlastic
+			if s == n and tipTemplate then
+				segs[s] = newMesh(tipTemplate, color, Enum.Material.Neon)
+			elseif segTemplate then
+				segs[s] = newMesh(segTemplate, color, mat)
+			else
+				segs[s] = newPart(Enum.PartType.Cylinder, color, mat)
+			end
+			if not segTemplate then
+				joints[s] = newPart(Enum.PartType.Ball, color, Enum.Material.Neon)
+			end
 		end
 		r.tentacles[i] = { segs = segs, joints = joints }
 	end
@@ -1914,7 +2220,7 @@ local function destroyRender(char)
 		for _, p in ipairs(tent.segs) do
 			p:Destroy()
 		end
-		for _, p in ipairs(tent.joints) do
+		for _, p in pairs(tent.joints) do
 			p:Destroy()
 		end
 	end
@@ -1956,6 +2262,14 @@ local function actionGoal(action, i, now, root, base)
 		local p = (typeof(tr) == "Instance" and tr.Parent) and tr.Position or base
 		local a = i * math.pi / 2 + now * 5
 		return p + Vector3.new(math.cos(a) * 1.3, (i - 2.5) * 0.7, math.sin(a) * 1.3)
+	elseif action.kind == "Swipe" then
+		-- Önde yatay savurma (sol tık)
+		local e = smoothstep((now - action.start) / (action.dur * 0.7))
+		local side = (action.combo % 2 == 1) and 1 or -1
+		local ang = math.rad(side * (75 - 150 * e))
+		local look = Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
+		local dir = CFrame.fromAxisAngle(Vector3.yAxis, ang):VectorToWorldSpace(look)
+		return root.Position + dir * 8 + Vector3.new(0, 0.5 + (i - 2.5) * 0.3, 0)
 	elseif action.kind == "Flurry" then
 		-- Her dokunaç farklı ritimde rastgele yönlere saplar
 		local beat = (now - action.start) / 0.18 + i * 0.5
@@ -2022,7 +2336,7 @@ local function updateRender(r, dt, now)
 		local tip = base + restDir * L + sway + trail
 		local mid = base + restDir * L * 0.4 + sway * 0.35 + tcf:VectorToWorldSpace(Vector3.new(0, 1.6, 1.4)) * gScale
 
-		if action then
+		if action and (not action.only or action.only[i]) then
 			local amt = actionAmount(action, now)
 			if amt > 0 then
 				local goal = actionGoal(action, i, now, root, base)
@@ -2045,11 +2359,23 @@ local function updateRender(r, dt, now)
 			local joint = tent.joints[s]
 			local len = (p - prev).Magnitude
 			if len > 0.001 then
-				seg.Size = Vector3.new(len * 1.15, w, w)
-				seg.CFrame = CFrame.lookAt((prev + p) / 2, p) * CFrame.Angles(0, math.rad(90), 0)
+				local cf = CFrame.lookAt((prev + p) / 2, p) * CFrame.Angles(0, math.rad(90), 0)
+				if s == n and tipTemplate then
+					-- sivri uç: biraz daha uzun ve kalın, ileri taşan
+					seg.Size = Vector3.new(len * 2.4, w * 3, w * 3)
+					seg.CFrame = cf * CFrame.new(len * 0.7, 0, 0)
+				elseif segTemplate then
+					seg.Size = Vector3.new(len * 1.35, w * 1.15, w * 1.15)
+					seg.CFrame = cf
+				else
+					seg.Size = Vector3.new(len * 1.15, w, w)
+					seg.CFrame = cf
+				end
 			end
-			joint.Size = Vector3.one * w * 1.08
-			joint.CFrame = CFrame.new(p)
+			if joint then
+				joint.Size = Vector3.one * w * 1.08
+				joint.CFrame = CFrame.new(p)
+			end
 			prev = p
 		end
 	end
@@ -2117,6 +2443,16 @@ fxRemote.OnClientEvent:Connect(function(kind, a, b, c)
 			local dur = (kind == "Flurry") and b or c
 			r.action = { kind = kind, start = os.clock(), dur = dur, target = (kind ~= "Flurry") and b or nil }
 		end
+	elseif kind == "Swipe" then
+		local char, combo = a, b
+		local r = char and renders[char]
+		if r then
+			local only = (combo % 2 == 1) and { [1] = true, [3] = true } or { [2] = true, [4] = true }
+			if combo >= 4 then
+				only = nil -- son vuruşta dört dokunaç birden
+			end
+			r.action = { kind = "Swipe", start = os.clock(), dur = 0.4, combo = combo, only = only }
+		end
 	end
 end)
 
@@ -2142,7 +2478,7 @@ end)
 
 refreshHUD()
 print("[Kaneki] KanekiClient hazır")
-]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX12"><Properties><string name="Name">VoidClient</string><ProtectedString name="Source"><![CDATA[-- VoidClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
+]]></ProtectedString></Properties></Item><Item class="LocalScript" referent="RBX14"><Properties><string name="Name">VoidClient</string><ProtectedString name="Source"><![CDATA[-- VoidClient (LocalScript) -> StarterPlayer > StarterPlayerScripts
 -- Girdi, uçuş, skill HUD'u, kamera sarsıntısı ve ultimate cutscene kamerası.
 
 local Players = game:GetService("Players")
