@@ -10,9 +10,7 @@ Obsidyen kayadan oyulmuş, içinden lav akan bir taht. `build_lava_throne.py` sc
 
 ## Neler var
 - **Gövde (`ThroneBody`):** Obsidyen taht. Sırtlıkta 5 sivri taç var. Ortada altın çerçeveli bir ejderha gözü rünü bulunuyor ve damarlar bu ründen dışarı yayılıyor. Kolçakların ucunda altın ejderha pençeleri lav kürelerini tutuyor. Yanlarda uçları kızgın lav gibi parlayan iki büyük boynuz var. Kenarları altın şeritlerle süslü.
-- **Platform:** Çatlamış bazalt zemin. İçine oyulmuş 6 lav nehri, arkada bir lav havuzu, 4 köşede küçük volkan ağızları ve önde basamaklar var.
-- **Lav şelalesi:** Sırtlığın arkasından aşağı akıp havuza dökülüyor.
-- **6 magma kayası:** Tahtın etrafında süzülüyor.
+- **Lav şelalesi:** Sırtlığın arkasından aşağı akıp tahtın arkasında yerdeki küçük bir lav birikintisine dökülüyor.
 - **Ateş tacı:** Taç uçlarının arasından yükselen 5 alev. Her alevin içinde ayrı bir sarı çekirdek var.
 - **Kadife minder:** Bordo renkte, altın düğmeli.
 
@@ -21,23 +19,21 @@ Obsidyen kayadan oyulmuş, içinden lav akan bir taht. `build_lava_throne.py` sc
 |---|---|
 | `LavaThrone.fbx` | Tüm parçalar, dokular gömülü olarak |
 | `textures/ThroneBody_{Color,Normal,Roughness,Metalness}.png` | Gövde PBR dokuları, 1024×1024 |
-| `textures/Platform_{Color,Normal,Roughness}.png` | Platform PBR dokuları, 1024×1024 |
-| `textures/MagmaRock_{Color,Normal,Roughness}.png` | Kaya PBR dokuları, 512×512 |
 | `LavaThrone.blend` | Önizleme animasyonlu sahne. Blender'da Space tuşuyla oynatılır. |
 | `renders/*.png` | Önizleme renderları |
 
-Ölçek 1 Blender birimi = 1 stud. Platform yaklaşık 14,5 stud genişliğinde, taht boynuzlarla birlikte yaklaşık 12 stud yüksekliğinde. Oturma yüksekliği zeminden yaklaşık 2 stud. Roblox'ta daha küçük istersen modeli seçip `Model:ScaleTo(0.75)` kullanabilirsin.
+Ölçek 1 Blender birimi = 1 stud. Taht doğrudan zemine oturur. Boynuzlarla birlikte yaklaşık 9 stud genişliğinde ve 11 stud yüksekliğinde. Oturma yüksekliği zeminden 2 stud. Roblox'ta daha küçük istersen modeli seçip `Model:ScaleTo(0.75)` kullanabilirsin.
 
 ## Roblox Studio'ya kurulum
 1. **İçe aktar:** Home → **Import 3D** → `LavaThrone.fbx`. Şu ayarları kullan:
    - **Import Only As Model** açık
    - **Anchored** açık
    - **Merge Meshes** kapalı. Hareketli parçalar ayrı kalmalı.
-2. **Dokular (SurfaceAppearance):** `ThroneBody`, `Platform` ve `MagmaRock_1..6` parçalarının içine birer **SurfaceAppearance** ekle. Haritaları `textures/` klasöründen ata:
+2. **Dokular (SurfaceAppearance):** `ThroneBody` parçasının içine bir **SurfaceAppearance** ekle. Haritaları `textures/` klasöründen ata:
    - `ColorMap` → `*_Color.png`
    - `NormalMap` → `*_Normal.png`
    - `RoughnessMap` → `*_Roughness.png`
-   - `MetalnessMap` → `ThroneBody_Metalness.png` (yalnızca gövde)
+   - `MetalnessMap` → `*_Metalness.png`
 
    PNG'leri **Asset Manager → Bulk Import** ile yükleyebilirsin. Importer bu dosyayı zaten oluşturduysa yalnızca haritaların doğru olduğunu kontrol et.
 3. **Neon parçalar:** Aşağıdaki parçaların `Material` ayarını **Neon** yap ve rengini ver.
@@ -45,8 +41,7 @@ Obsidyen kayadan oyulmuş, içinden lav akan bir taht. `build_lava_throne.py` sc
    | Parça | Renk (RGB) | Not |
    |---|---|---|
    | `LavaVeins_Front`, `LavaVeins_Back`, `LavaVeins_Base`, `HornTip_L/R` | 255, 110, 20 | |
-   | `Lavafall`, `LavaPool`, `VentLava_1..4` | 255, 90, 10 | |
-   | `LavaRivers` | 255, 80, 10 | |
+   | `Lavafall`, `LavaPool` | 255, 90, 10 | |
    | `RuneGlow`, `ClawOrb_L/R` | 255, 170, 60 | |
    | `Flame_1..5` | 255, 85, 15 | Transparency 0.15 |
    | `FlameCore_1..5` | 255, 200, 90 | |
@@ -65,14 +60,13 @@ Roblox rig'siz FBX animasyonunu kullanamaz. Bu yüzden hareket eden her parça a
 
 | Parça | Hareket | Pivot |
 |---|---|---|
-| `MagmaRock_1..6` | Tahtın etrafında yörünge, inip kalkma, kendi etrafında dönme | merkez (0, 0) |
 | `Flame_*`, `FlameCore_*` | Boyu titreyerek uzar ve kısalır | alevin tabanı |
 | Tüm Neon parçalar | Parlaklık nabız gibi atar. Roblox'ta Color tween'i ile yapılır. | |
 | `RuneGlow`, `ClawOrb_*`, `HornTip_*` | Oturunca parlar | |
-| `VentLava_*` | Oturunca lav fışkırtır. Buraya ParticleEmitter eklenir. | |
+| `LavaPool` | Oturunca kabarır. Buraya duman/kor ParticleEmitter eklenir. | |
 
 **Parçacık önerileri:**
-- `VentLava_*` ve `LavaPool` üzerine Attachment ve ParticleEmitter ekle (kor, duman).
+- `LavaPool` üzerine Attachment ve ParticleEmitter ekle (kor, duman).
 - Alevlerin üstüne `Fire` ekle.
 - Tüm modele hafif turuncu bir kor ParticleEmitter ekle. Renderdaki uçuşan korlar yalnızca önizleme içindir, FBX'te yoktur.
 
@@ -80,6 +74,7 @@ Roblox rig'siz FBX animasyonunu kullanamaz. Bu yüzden hareket eden her parça a
 ```bash
 python3 blender/build_lava_throne.py --render   # tam kalite (~10 dk, CPU)
 python3 blender/build_lava_throne.py --quick    # hızlı deneme
+python3 blender/build_lava_throne.py --platform # altına lav platformu + süzülen magma kayaları ekler
 ```
 Ayarlamak istersen:
 - **Şekil:** `OUTLINE` (sırtlık konturu) ve `horn_points` (boynuz eğrisi).

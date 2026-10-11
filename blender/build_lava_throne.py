@@ -5,6 +5,7 @@ Calistirma:
   python3 blender/build_lava_throne.py            # FBX + dokular + .blend
   python3 blender/build_lava_throne.py --render   # ayrica onizleme renderlari
   python3 blender/build_lava_throne.py --quick    # hizli deneme (dusuk cozunurluk)
+  python3 blender/build_lava_throne.py --platform # lav platformu + magma kayalari ile
   blender --background --python blender/build_lava_throne.py -- --render
 
 Yontem:
@@ -37,6 +38,7 @@ from build_chairs import box, cyl, join, new_obj, prism, torus  # noqa: E402
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 QUICK = "--quick" in ARGS
 RENDER = "--render" in ARGS
+PLATFORM = "--platform" in ARGS      # alttaki platform + kayalar (istege bagli)
 
 TEX = 256 if QUICK else 1024          # Roblox SurfaceAppearance en fazla 1024
 ROCK_TEX = 128 if QUICK else 512
@@ -65,6 +67,7 @@ POOL_R = 1.05
 VENTS = [Vector((math.cos(a) * 6.15, math.sin(a) * 6.15))
          for a in (math.radians(d) for d in (45, 135, 225, 315))]
 ORB_R = 0.36
+VIEW_DZ = 0.0 if PLATFORM else -PLAT_TOP
 ORBS = {s: Vector((s * 2.5, -2.05, 4.16)) for s in (-1, 1)}
 
 rng = random.Random(1912)
@@ -1135,16 +1138,25 @@ def ribbon_from_hits(tree, origins, direction, width, flat, lift=0.0,
 
 
 def build_lavafall(coll, mat, body_hi, plat_hi):
-    tb, tp = bvh(body_hi), bvh(plat_hi)
+    tb = bvh(body_hi)
     vs = np.linspace(8.25, 0.2, 90)
     origins = [REAR.to3d((0.08 * math.sin(v * 1.7), v), 0.8) for v in vs]
     widths = [0.24 + 0.14 * (1 - v / 8.25) for v in vs]
     p1, n1, r1 = ribbon_from_hits(tb, origins, -REAR.n, widths, 0.35, 0.0)
     base = p1[-1]
-    tail = [Vector((0.0, y, 4.0)) for y in np.linspace(base.y + 0.15,
-                                                       POOL.y, 14)]
-    p2, n2, r2 = ribbon_from_hits(tp, tail, Vector((0, 0, -1)),
-                                  [0.4] * len(tail), 0.3, -0.02)
+    if plat_hi is not None:
+        tail = [Vector((0.0, y, 4.0)) for y in np.linspace(base.y + 0.15,
+                                                           POOL.y, 14)]
+        p2, n2, r2 = ribbon_from_hits(bvh(plat_hi), tail, Vector((0, 0, -1)),
+                                      [0.4] * len(tail), 0.3, -0.02)
+    else:
+        # Tabandan yere kivrilip arkadaki birikintiye akar
+        up = Vector((0, 0, 1))
+        p2 = [base + REAR.n * 0.1 + Vector((0, 0, -0.08)),
+              Vector((base.x, base.y + 0.3, PLAT_TOP + 0.05)),
+              Vector((base.x, base.y + 0.55, PLAT_TOP + 0.04))]
+        n2 = [(REAR.n + up).normalized(), up, up]
+        r2 = [0.39, 0.42, 0.44]
     bm = bmesh.new()
     sweep_bm(bm, p1 + p2, r1 + r2, n1 + n2, sides=10, flat=0.35)
     # tepedeki kaynak (catlak agzi)
@@ -1177,6 +1189,18 @@ def build_pool(coll, mat, plat_hi):
             else:
                 bm.faces.new((prev[j], ring[j], ring[k], prev[k]))
         prev = ring
+    return mesh_obj("LavaPool", bm, coll, mat)
+
+
+def build_puddle(coll, mat, center):
+    """Lav selalesinin yere dokuldugu kucuk birikinti (platformsuz)."""
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=10, radius=1.0)
+    for v in bm.verts:
+        a = math.atan2(v.co.y, v.co.x)
+        r = 1 + 0.18 * noise.noise(Vector((math.cos(a), math.sin(a), 3.0)))
+        v.co = Vector((center.x, center.y, center.z)) + Vector((
+            v.co.x * 0.85 * r, v.co.y * 0.7 * r, max(v.co.z, -0.2) * 0.07))
     return mesh_obj("LavaPool", bm, coll, mat)
 
 
@@ -1330,20 +1354,24 @@ def cyclic(obj_or_data):
 
 def animate(scene, objs, rocks):
     # Magma kayalari: merkez etrafinda yorunge + inip kalkma
-    pivot = bpy.data.objects.new("RockOrbit", None)
-    scene.collection.objects.link(pivot)
-    for r in rocks:
-        mw = r.matrix_world.copy()
-        r.parent = pivot
-        r.matrix_world = mw
-    pivot.rotation_euler = (0, 0, 0)
-    pivot.keyframe_insert("rotation_euler", index=2, frame=1)
-    pivot.rotation_euler = (0, 0, 2 * math.pi)
-    pivot.keyframe_insert("rotation_euler", index=2, frame=481)
-    cyclic(pivot)
-    for fc in _curves(pivot):
-        for kp in fc.keyframe_points:
-            kp.interpolation = "LINEAR"
+    if not rocks:
+        pivot = None
+    else:
+        pivot = bpy.data.objects.new("RockOrbit", None)
+        scene.collection.objects.link(pivot)
+    if pivot:
+        for r in rocks:
+            mw = r.matrix_world.copy()
+            r.parent = pivot
+            r.matrix_world = mw
+        pivot.rotation_euler = (0, 0, 0)
+        pivot.keyframe_insert("rotation_euler", index=2, frame=1)
+        pivot.rotation_euler = (0, 0, 2 * math.pi)
+        pivot.keyframe_insert("rotation_euler", index=2, frame=481)
+        cyclic(pivot)
+        for fc in _curves(pivot):
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
     for i, r in enumerate(rocks):
         z0 = r.location.z
         for fr, dz in ((1, 0), (40 + i * 7, 0.35), (120, 0)):
@@ -1514,11 +1542,15 @@ def render_views(scene, cam):
     scene.render.resolution_x, scene.render.resolution_y = w, h
     setup_compositor(scene)
     scene.frame_set(40)
+    dz = VIEW_DZ
     views = [
-        ("Hero", (0, 0.5, 5.6), 24, 6.0, math.radians(-28), 42),
-        ("CloseUp", (0, 0.4, 5.6), 10.5, 2.2, math.radians(-14), 38),
-        ("Back", (0, 1.5, 5.0), 21, 6.5, math.radians(150), 40),
-        ("LowAngle", (0, 0.5, 6.4), 15.5, -4.2, math.radians(22), 26),
+        ("Hero", (0, 0.5, 5.6 + dz * 0.4), 23 if dz else 24, 6.0,
+         math.radians(-28), 42),
+        ("CloseUp", (0, 0.4, 5.6 + dz), 10.5, 2.2, math.radians(-14), 38),
+        ("Back", (0, 1.5, 5.0), 21, 6.5,
+         math.radians(150), 40),
+        ("LowAngle", (0, 0.5, 6.4 + dz), 14 if dz else 15.5, -4.2,
+         math.radians(22), 26),
     ]
     for name, tgt, dist, hgt, ang, lens in views:
         aim(cam, tgt, dist, hgt, ang, lens)
@@ -1532,6 +1564,8 @@ def render_views(scene, cam):
 # ---------------------------------------------------------------------------
 
 def main():
+    import shutil
+    shutil.rmtree(EXPORT_DIR, ignore_errors=True)  # eski doku/renderlar kalmasin
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     scene.render.engine = "CYCLES"
@@ -1582,13 +1616,16 @@ def main():
     bake_set("ThroneBody", throne, [body_hi, gold_hi] + horns_hi, TEX,
              ["color", "normal", "roughness", "metallic", "ao"])
 
-    # --- Platform ------------------------------------------------------
-    print("Platform...")
-    river = build_river_net()
-    plat_hi = build_platform_high(work, river)
-    plat_hi.data.materials.append(m_basalt)
-    plat_lo = make_low(plat_hi, "Platform", 9500 if not QUICK else 3000, out)
-    unwrap(plat_lo)
+    # --- Platform (istege bagli) --------------------------------------
+    plat_hi = None
+    if PLATFORM:
+        print("Platform...")
+        river = build_river_net()
+        plat_hi = build_platform_high(work, river)
+        plat_hi.data.materials.append(m_basalt)
+        plat_lo = make_low(plat_hi, "Platform", 9500 if not QUICK else 3000,
+                           out)
+        unwrap(plat_lo)
 
     # --- Neon parcalar (bake'ten once: AO icin sahnede olsunlar) ------
     print("Neon parcalar...")
@@ -1602,12 +1639,17 @@ def main():
               nets["arm1"].tubes(out, "c", lava_v, body_hi, 0.045,
                                  step=0.08)], "LavaVeins_Base"),
         build_lavafall(out, lava_f, body_hi, plat_hi),
-        build_pool(out, lava_f, plat_hi),
-        river.tubes(out, "LavaRivers", lava_r, plat_hi, 0.2, sides=8,
-                    flat=0.32, lift=0.0, step=0.12, h=6.0),
         build_rune(out, lava_o),
     ]
-    neon += build_vent_lava(out, lava_f, plat_hi)
+    if PLATFORM:
+        neon += [build_pool(out, lava_f, plat_hi),
+                 river.tubes(out, "LavaRivers", lava_r, plat_hi, 0.2,
+                             sides=8, flat=0.32, lift=0.0, step=0.12, h=6.0)]
+        neon += build_vent_lava(out, lava_f, plat_hi)
+    else:
+        fall_end = REAR.to3d((0, 0), 0) + REAR.n * 0.75
+        neon.append(build_puddle(out, lava_f, Vector((0, fall_end.y,
+                                                      PLAT_TOP + 0.01))))
     for s in (-1, 1):
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=14,
@@ -1620,10 +1662,31 @@ def main():
     neon += build_flames(out, fl_out, fl_in)
     seat, buttons = build_cushion(out, velvet, gold_simple)
 
-    bake_set("Platform", plat_lo, [plat_hi], TEX,
-             ["color", "normal", "roughness", "ao"], extrusion=0.1, ray=0.3)
+    rocks = []
+    if PLATFORM:
+        bake_set("Platform", plat_lo, [plat_hi], TEX,
+                 ["color", "normal", "roughness", "ao"], extrusion=0.1,
+                 ray=0.3)
+        rocks = build_rocks(work, out, m_magma)
 
-    # --- Magma kayalari ------------------------------------------------
+    # Yuksek detayli kaynaklar artik gereksiz
+    for ob in list(work.objects):
+        me = ob.data
+        bpy.data.objects.remove(ob)
+        if me.users == 0:
+            bpy.data.meshes.remove(me)
+    bpy.data.collections.remove(work)
+
+    # Platform yoksa taht dogrudan zemine (z=0) oturur
+    if not PLATFORM:
+        for ob in out.objects:
+            ob.location.z -= PLAT_TOP
+
+    # --- Kontrol + disa aktarma ---------------------------------------
+    finish_export(scene, out, fx, rocks)
+
+
+def build_rocks(work, out, m_magma):
     print("Magma kayalari...")
     rock_hi = build_magma_rock_high(work, m_magma)
     rock_lo = make_low(rock_hi, "MagmaRock_1", 520, out)
@@ -1646,16 +1709,10 @@ def main():
                             rng.uniform(0, 3))
         s = rng.uniform(0.42, 0.7)
         r.scale = (s, s, s)
+    return rocks
 
-    # Yuksek detayli kaynaklar artik gereksiz
-    for ob in list(work.objects):
-        me = ob.data
-        bpy.data.objects.remove(ob)
-        if me.users == 0:
-            bpy.data.meshes.remove(me)
-    bpy.data.collections.remove(work)
 
-    # --- Kontrol + disa aktarma ---------------------------------------
+def finish_export(scene, out, fx, rocks):
     total = 0
     for ob in out.objects:
         t = tris(ob)
@@ -1678,7 +1735,7 @@ def main():
 
     animate(scene, list(out.objects), rocks)
     cam = build_preview(scene, fx)
-    aim(cam, (0, 0.5, 5.6), 24, 6.0, math.radians(-28), 42)
+    aim(cam, (0, 0.5, 5.6 + VIEW_DZ), 24, 6.0, math.radians(-28), 42)
     bpy.ops.file.make_paths_relative() if bpy.data.filepath else None
     blend = os.path.join(EXPORT_DIR, "LavaThrone.blend")
     bpy.ops.wm.save_as_mainfile(filepath=blend, relative_remap=True)
