@@ -1,0 +1,17 @@
+{
+  "name": "RobloxShop",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "ShopItems": { "$path": "src/ReplicatedStorage/ShopItems.lua" }
+    },
+    "ServerScriptService": {
+      "ShopServer": { "$path": "src/ServerScriptService/ShopServer.server.lua" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "ShopClient": { "$path": "src/StarterPlayerScripts/ShopClient.client.lua" }
+      }
+    }
+  }
+}

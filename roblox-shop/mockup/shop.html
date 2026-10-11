@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Roblox Mağaza Taslağı</title>
+<style>
+  :root {
+    --panel: #141826;
+    --header: #1c2236;
+    --sidebar: #181d2e;
+    --card: #222842;
+    --card-hi: #2b3254;
+    --text: #ffffff;
+    --muted: #9aa3c0;
+    --accent: #ffc83d;
+    --green: #3ddc84;
+    --green-d: #22b566;
+    --red: #ff4d5e;
+    --common: #9aa3c0;
+    --rare: #4da3ff;
+    --epic: #b26bff;
+    --legend: #ffb020;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    font-family: "Inter", sans-serif; color: var(--text);
+    background: #000;
+  }
+  /* Sahte oyun sahnesi */
+  .scene {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 105%, #4f9a3c 0 38%, transparent 38.2%),
+      radial-gradient(ellipse at 85% 110%, #5aa845 0 40%, transparent 40.2%),
+      linear-gradient(#7cc3f5 0%, #b9e3ff 62%, #6fb04f 62%, #4f8e39 100%);
+  }
+  .scene::after { content: ""; position: absolute; inset: 0; background: rgba(5, 8, 20, .45); }
+  .cloud { position: absolute; background: #fff; border-radius: 40px; opacity: .85; z-index: 0; }
+
+  /* HUD */
+  .hud-btn {
+    position: absolute; left: 24px; top: 50%; transform: translateY(-50%);
+    width: 76px; height: 76px; border-radius: 18px;
+    background: linear-gradient(180deg, #ffd85c, #ffb020);
+    border: 3px solid #fff3; box-shadow: 0 6px 0 #b9760b;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px; color: #4a2c00; z-index: 2;
+  }
+  .hud-btn .ico { font-size: 30px; line-height: 1; margin-bottom: 2px; }
+  .hud-coins {
+    position: absolute; right: 24px; top: 20px; z-index: 2;
+    background: rgba(20, 24, 38, .9); border: 2px solid #ffffff22; border-radius: 999px;
+    padding: 8px 18px 8px 10px; font-weight: 800; font-size: 20px; display: flex; gap: 8px; align-items: center;
+  }
+
+  /* Mağaza paneli */
+  .shop {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 860px; height: 540px; z-index: 3;
+    background: var(--panel); border-radius: 18px;
+    border: 3px solid #2e3657; box-shadow: 0 20px 60px #0009;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .header {
+    height: 68px; flex: none; background: linear-gradient(180deg, #232a44, var(--header));
+    display: flex; align-items: center; padding: 0 16px 0 22px; gap: 12px;
+    border-bottom: 2px solid #2e3657;
+  }
+  .title { font-size: 28px; font-weight: 900; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+  .title small { font-size: 26px; }
+  .coins {
+    margin-left: auto; height: 42px; padding: 0 16px 0 8px; border-radius: 999px;
+    background: #0e1120; border: 2px solid #ffd54a55;
+    display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; color: #ffd54a;
+  }
+  .coins .plus {
+    width: 26px; height: 26px; border-radius: 50%; background: var(--green); color: #0b3a20;
+    display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; margin-left: 6px;
+  }
+  .close {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--red);
+    box-shadow: 0 4px 0 #b02232; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 22px;
+  }
+  .body { flex: 1; display: flex; min-height: 0; }
+
+  .sidebar { width: 178px; flex: none; background: var(--sidebar); padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .tab {
+    height: 48px; border-radius: 12px; background: #20263c; color: var(--muted);
+    display: flex; align-items: center; gap: 10px; padding: 0 12px; font-weight: 700; font-size: 15px;
+  }
+  .tab .e { font-size: 20px; }
+  .tab.active { background: var(--accent); color: #3a2600; box-shadow: 0 4px 0 #c4900f; }
+
+  .grid-wrap { flex: 1; padding: 14px; overflow: hidden; position: relative; }
+  .search {
+    height: 38px; border-radius: 10px; background: #0e1120; border: 2px solid #2e3657;
+    color: var(--muted); font-size: 14px; display: flex; align-items: center; padding: 0 12px; gap: 8px; margin-bottom: 12px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .card {
+    height: 186px; border-radius: 14px; background: var(--card); position: relative; overflow: hidden;
+    border: 3px solid transparent; display: flex; flex-direction: column; align-items: center; padding-top: 10px;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 92px;
+    background: linear-gradient(180deg, var(--r) 0%, transparent 100%); opacity: .35;
+  }
+  .card.sel { border-color: var(--accent); background: var(--card-hi); }
+  .card .icon { font-size: 54px; line-height: 1; height: 70px; display: flex; align-items: center; position: relative; }
+  .card .name { font-weight: 800; font-size: 15px; margin-top: 8px; position: relative; max-width: 92%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .rar { font-weight: 700; font-size: 11px; color: var(--r); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+  .card .price {
+    position: absolute; left: 10px; right: 10px; bottom: 10px; height: 34px; border-radius: 10px;
+    background: linear-gradient(180deg, var(--green), var(--green-d)); box-shadow: 0 3px 0 #168a4b;
+    display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 900; font-size: 16px; color: #fff;
+  }
+  .card .price.owned { background: #353d5e; box-shadow: 0 3px 0 #23283f; color: var(--muted); font-size: 13px; }
+  .card .price.equipped { background: linear-gradient(180deg, #4da3ff, #2f7fd6); box-shadow: 0 3px 0 #1f5ea3; font-size: 13px; }
+  .card .stripe { position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--r); }
+  .badge {
+    position: absolute; top: 10px; right: 10px; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 6px;
+    background: var(--red); letter-spacing: .5px;
+  }
+  .scrollbar { position: absolute; right: 4px; top: 66px; width: 6px; height: 260px; border-radius: 3px; background: #ffffff22; }
+
+  .detail { width: 236px; flex: none; background: var(--sidebar); padding: 16px; display: flex; flex-direction: column; border-left: 2px solid #232a44; }
+  .detail .big {
+    height: 150px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 86px;
+    background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--r) 55%, transparent), #20263c 70%);
+    border: 2px solid color-mix(in srgb, var(--r) 60%, transparent);
+  }
+  .detail h2 { font-size: 21px; font-weight: 900; margin-top: 12px; }
+  .pill { align-self: flex-start; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: 1px; background: var(--r); color: #241500; }
+  .detail p { color: var(--muted); font-size: 13px; line-height: 1.45; margin-top: 10px; }
+  .stats { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .stat { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; background: #20263c; border-radius: 8px; padding: 7px 10px; }
+  .stat span:last-child { color: var(--accent); }
+  .buy {
+    margin-top: auto; height: 52px; border-radius: 12px; background: linear-gradient(180deg, var(--green), var(--green-d));
+    box-shadow: 0 5px 0 #168a4b; display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 900; font-size: 18px;
+  }
+  .buy.equip { background: linear-gradient(180deg, #4da3ff, #2f7fd6); box-shadow: 0 5px 0 #1f5ea3; }
+
+  /* Onay penceresi */
+  .dim { position: absolute; inset: 0; background: #05081ccc; z-index: 4; display: none; }
+  .modal {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: none;
+    width: 400px; border-radius: 18px; background: var(--panel); border: 3px solid #2e3657; padding: 22px; text-align: center;
+    box-shadow: 0 20px 60px #000a;
+  }
+  .modal .mi { font-size: 70px; line-height: 1; }
+  .modal h3 { font-size: 22px; font-weight: 900; margin-top: 10px; }
+  .modal p { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .modal .cost { margin: 14px auto 0; display: inline-flex; gap: 8px; align-items: center; font-weight: 900; font-size: 22px; color: #ffd54a; background: #0e1120; border-radius: 999px; padding: 6px 18px; }
+  .modal .row { display: flex; gap: 12px; margin-top: 18px; }
+  .modal .btn { flex: 1; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 17px; }
+  .btn.no { background: #353d5e; box-shadow: 0 4px 0 #23283f; }
+  .btn.yes { background: linear-gradient(180deg, var(--green), var(--green-d)); box-shadow: 0 4px 0 #168a4b; }
+
+  /* Bildirim */
+  .toast {
+    position: absolute; left: 50%; top: 22px; transform: translateX(-50%); z-index: 6; display: none;
+    background: linear-gradient(180deg, var(--green), var(--green-d)); border-radius: 14px; padding: 12px 22px;
+    font-weight: 900; font-size: 17px; box-shadow: 0 5px 0 #168a4b, 0 12px 30px #0007; gap: 10px; align-items: center;
+  }
+
+  body.confirm .dim, body.confirm .modal { display: block; }
+  body.bought .toast { display: flex; }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="cloud" style="left:180px;top:70px;width:160px;height:46px"></div>
+  <div class="cloud" style="left:930px;top:120px;width:210px;height:56px"></div>
+</div>
+
+<div class="hud-btn"><div class="ico">🛒</div>MAĞAZA</div>
+<div class="hud-coins">🪙 <span class="coinval">2.450</span></div>
+<div class="toast">✅ Thor'un Çekici satın alındı!</div>
+
+<div class="shop">
+  <div class="header">
+    <div class="title"><small>🛒</small>MAĞAZA</div>
+    <div class="coins">🪙 <span class="coinval">2.450</span><div class="plus">+</div></div>
+    <div class="close">✕</div>
+  </div>
+  <div class="body">
+    <div class="sidebar">
+      <div class="tab active"><span class="e">⚔️</span>Silahlar</div>
+      <div class="tab"><span class="e">⚡</span>Güçler</div>
+      <div class="tab"><span class="e">🐾</span>Evcil Hayvan</div>
+      <div class="tab"><span class="e">✨</span>Efektler</div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="search">🔍 Eşya ara...</div>
+      <div class="grid">
+        <div class="card" style="--r:var(--common)"><div class="stripe"></div><div class="icon">🗡️</div><div class="name">Tahta Kılıç</div><div class="rar">Sıradan</div><div class="price equipped">KUŞANILDI</div></div>
+        <div class="card" style="--r:var(--common)"><div class="stripe"></div><div class="icon">🪓</div><div class="name">Savaş Baltası</div><div class="rar">Sıradan</div><div class="price">🪙 250</div></div>
+        <div class="card" style="--r:var(--rare)"><div class="stripe"></div><div class="icon">🏹</div><div class="name">Okçu Yayı</div><div class="rar">Nadir</div><div class="price">🪙 600</div></div>
+        <div class="card sel" style="--r:var(--epic)"><div class="stripe"></div><div class="badge">YENİ</div><div class="icon">🔨</div><div class="name">Thor'un Çekici</div><div class="rar">Epik</div><div class="price" id="selPrice">🪙 1.500</div></div>
+        <div class="card" style="--r:var(--rare)"><div class="stripe"></div><div class="icon">⚔️</div><div class="name">Çift Kılıç</div><div class="rar">Nadir</div><div class="price owned">SAHİPSİN</div></div>
+        <div class="card" style="--r:var(--legend)"><div class="stripe"></div><div class="icon">🔱</div><div class="name">Deniz Mızrağı</div><div class="rar">Efsanevi</div><div class="price">🪙 5.000</div></div>
+      </div>
+      <div class="scrollbar"></div>
+    </div>
+
+    <div class="detail" style="--r:var(--epic)">
+      <div class="big">🔨</div>
+      <h2>Thor'un Çekici</h2>
+      <div class="pill">EPİK</div>
+      <p>Yere vurduğunda etrafındaki herkesi geri savuran efsanevi gök gürültüsü çekici.</p>
+      <div class="stats">
+        <div class="stat"><span>Hasar</span><span>45</span></div>
+        <div class="stat"><span>Hız</span><span>Yavaş</span></div>
+      </div>
+      <div class="buy" id="buyBtn">SATIN AL · 🪙 1.500</div>
+    </div>
+  </div>
+</div>
+
+<div class="dim"></div>
+<div class="modal">
+  <div class="mi">🔨</div>
+  <h3>Thor'un Çekici</h3>
+  <p>Bu eşyayı satın almak istediğine emin misin?</p>
+  <div class="cost">🪙 1.500</div>
+  <div class="row"><div class="btn no">İPTAL</div><div class="btn yes">ONAYLA</div></div>
+</div>
+
+<script>
+  const state = new URLSearchParams(location.search).get("state") || "main";
+  document.body.classList.add(state);
+  if (state === "bought") {
+    document.querySelectorAll(".coinval").forEach(e => e.textContent = "950");
+    const p = document.getElementById("selPrice");
+    p.className = "price equipped"; p.textContent = "KUŞANILDI";
+    document.querySelector(".card .price.equipped").className = "price owned";
+    document.querySelectorAll(".card .price.owned")[0].textContent = "SAHİPSİN";
+    document.querySelector(".badge").remove();
+    const b = document.getElementById("buyBtn");
+    b.className = "buy equip"; b.textContent = "✓ KUŞANILDI";
+  }
+</script>
+</body>
+</html>
