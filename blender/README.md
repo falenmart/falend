@@ -1,5 +1,7 @@
 # Anime Koltukları (Blender → Roblox)
 
+> **Yeni: [Lav Tahtı](LAVA_THRONE.md)**: PBR dokulu, parlayan lav damarlı özel (limited) taht.
+
 Bu klasörde oturulabilen 4 anime temalı koltuk var. Hepsi `build_chairs.py` scripti ile Blender'da üretiliyor.
 
 ![Tüm koltuklar](export/renders/AllChairs.png)
