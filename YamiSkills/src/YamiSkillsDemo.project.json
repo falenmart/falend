@@ -13,6 +13,7 @@
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
+      "$properties": { "EnableMouseLockOption": false },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "YamiSkillsClient": { "$path": "roblox/client" }

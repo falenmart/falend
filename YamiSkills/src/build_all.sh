@@ -7,6 +7,7 @@ PY="${PY:-python3}"
 ROOT=..
 "$PY" blender/build_vfx.py -- "$ROOT/Blender" "$ROOT/Previews/vfx_meshes.png"
 "$PY" blender/build_rig_anims.py -- "$ROOT/Blender" roblox/shared/Animations "$ROOT/Previews"
+"$PY" blender/boss_build.py -- "$ROOT/Blender" roblox/shared "$ROOT/Previews"
 "$PY" tools/make_sfx.py "$ROOT/Blender/Sounds"
 "$PY" tools/make_demo_arena.py roblox/demo
 rojo build YamiSkills.project.json -o "$ROOT/Roblox/1_ReplicatedStorage_YamiSkills.rbxm"

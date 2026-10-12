@@ -101,7 +101,16 @@ class RefGen:
         return f"RBX{self.n:08X}"
 
 
-def pose_xml(part, cframes, animated, needed, ref, indent):
+def rig_hierarchy(arm_obj):
+    """(part, parent) pairs from the armature bone tree (root bone = HumanoidRootPart)."""
+    pairs = []
+    for b in arm_obj.data.bones:
+        if b.parent is not None:
+            pairs.append((b.name, b.parent.name))
+    return pairs
+
+
+def pose_xml(part, cframes, animated, needed, ref, indent, children=None):
     weight = 1.0 if part in animated else 0.0
     cf = cframes.get(part, Matrix.Identity(4)) if weight > 0 else Matrix.Identity(4)
     s = f'{indent}<Item class="Pose" referent="{ref()}">\n'
@@ -112,9 +121,9 @@ def pose_xml(part, cframes, animated, needed, ref, indent):
     s += f'{indent}\t\t<token name="EasingStyle">0</token>\n'
     s += f'{indent}\t\t<float name="Weight">{fmt(weight)}</float>\n'
     s += f"{indent}\t</Properties>\n"
-    for child in CHILDREN.get(part, []):
+    for child in (children or CHILDREN).get(part, []):
         if child in needed:
-            s += pose_xml(child, cframes, animated, needed, ref, indent + "\t")
+            s += pose_xml(child, cframes, animated, needed, ref, indent + "\t", children)
     s += f"{indent}</Item>\n"
     return s
 
@@ -123,13 +132,18 @@ def export_action(arm_obj, action, out_dir, sample_fps=30):
     scene = bpy.context.scene
     fps = scene.render.fps / scene.render.fps_base
     assign_action(arm_obj, action)
-    animated = animated_bones(action) & set(PARTS)
+    hierarchy = rig_hierarchy(arm_obj)
+    parent_of = dict(hierarchy)
+    children = {}
+    for _p, _par in hierarchy:
+        children.setdefault(_par, []).append(_p)
+    animated = animated_bones(action) & set(parent_of)
     needed = set()
     for p in animated:  # every ancestor of an animated part must exist as a (weight 0) pose
         cur = p
         while cur is not None:
             needed.add(cur)
-            cur = dict(HIERARCHY).get(cur)
+            cur = parent_of.get(cur)
     f0, f1 = action.frame_range
     step = fps / sample_fps
     frames = set()
@@ -169,7 +183,7 @@ def export_action(arm_obj, action, out_dir, sample_fps=30):
         out.append(f'\t\t<Item class="Keyframe" referent="{ref()}">\n')
         out.append(f'\t\t\t<Properties>\n\t\t\t\t<string name="Name">Keyframe</string>\n'
                    f'\t\t\t\t<float name="Time">{fmt(t)}</float>\n\t\t\t</Properties>\n')
-        out.append(pose_xml("HumanoidRootPart", cframes, animated, needed | {"HumanoidRootPart"}, ref, "\t\t\t"))
+        out.append(pose_xml("HumanoidRootPart", cframes, animated, needed | {"HumanoidRootPart"}, ref, "\t\t\t", children))
         for mname in markers.get(round(fr, 4), []):
             out.append(f'\t\t\t<Item class="KeyframeMarker" referent="{ref()}">\n'
                        f'\t\t\t\t<Properties>\n\t\t\t\t\t<string name="Name">{su.escape(mname)}</string>\n'
@@ -196,9 +210,9 @@ def export_all(arm_obj, out_dir, sample_fps=30):
 
 
 if __name__ == "__main__":
-    rig = bpy.data.objects.get("YamiRig")
+    rig = bpy.data.objects.get("YamiRig") or bpy.data.objects.get("YamiBossRig")
     if rig is None:
-        raise SystemExit("YamiRig armature not found")
+        raise SystemExit("YamiRig / YamiBossRig armature not found")
     base = bpy.path.abspath("//") or os.getcwd()
     for path, n, parts in export_all(rig, os.path.join(base, "RobloxAnimations")):
         print(f"exported {path} ({n} keyframes, {len(parts)} joints)")

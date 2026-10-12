@@ -382,12 +382,17 @@ function VFX.Crescent(cf: CFrame, opts: { [string]: any }?)
 	local dur = o.Duration or 0.3
 	local grow = o.Grow or 1.12
 	local base = cf * CFrame.Angles(0, 0, roll)
+	local color: Color3 = o.Color or BLACK
 	local mesh = VFX.Mesh("SlashArc", radius / 5)
 	if mesh then
 		local off = VFX.MeshOffset("SlashArc")
 		local size0 = mesh.Size
 		local t0 = o.Transparency or 0.01
-		mesh.Color = BLACK
+		mesh.Color = color
+		if o.Color then -- renkli kesik: siyah dokuyu kaldır
+			mesh.TextureID = ""
+			t0 = math.max(t0, 0.15)
+		end
 		VFX.Animate(dur, function(a)
 			local e = outCubic(a)
 			mesh.Size = size0 * (1 + (grow - 1) * e)
@@ -413,7 +418,11 @@ function VFX.Crescent(cf: CFrame, opts: { [string]: any }?)
 			local rmid = radius - 0.28 * t
 			local chord = 2 * rmid * math.sin(span / segs / 2) * 1.08
 			local local_cf = CFrame.new(math.sin(th) * rmid, 0, -math.cos(th) * rmid) * CFrame.Angles(0, -th, 0)
-			local p = VFX.Part({ Size = Vector3.new(chord, 0.14, t), Transparency = 0.04 + 0.6 * (1 - um) ^ 2 })
+			local p = VFX.Part({
+				Size = Vector3.new(chord, 0.14, t),
+				Transparency = 0.04 + 0.6 * (1 - um) ^ 2,
+				Color = color,
+			})
 			table.insert(parts, { part = p, cf = local_cf, base = p.Transparency, size = p.Size })
 		end
 	end
@@ -623,7 +632,10 @@ function VFX.Shockwave(cf: CFrame | Vector3, opts: { [string]: any }?)
 	if mesh then
 		local off = VFX.MeshOffset("ShockRing")
 		local s0 = mesh.Size / math.max(mesh.Size.X, 1e-3)
-		mesh.Color = BLACK
+		mesh.Color = o.Color or BLACK
+		if o.Color then
+			mesh.TextureID = ""
+		end
 		local thick = o.Thickness or 1
 		VFX.Animate(dur, function(a)
 			local e = outQuint(a)
@@ -637,6 +649,7 @@ function VFX.Shockwave(cf: CFrame | Vector3, opts: { [string]: any }?)
 		end)
 	else
 		VFX.Burst(frame, "Ring", 1, {
+			Color = ColorSequence.new(o.Color or BLACK),
 			Size = ns({ { 0, 1.5 }, { 1, radius * 2 } }),
 			Lifetime = NumberRange.new(dur, dur),
 		})
@@ -670,9 +683,9 @@ function VFX.Shards(cf: CFrame, opts: { [string]: any }?)
 		local part: BasePart
 		if mesh then
 			part = mesh
-			mesh.Color = BLACK
+			mesh.Color = o.Color or BLACK
 		else
-			part = VFX.Part({ ClassName = "WedgePart" })
+			part = VFX.Part({ ClassName = "WedgePart", Color = o.Color or BLACK })
 		end
 		local finalSize = if mesh then Vector3.new(width * 1.5, width * 0.4, len) else Vector3.new(0.12, len, width)
 		local orient = if mesh then CFrame.lookAt(Vector3.zero, dir) else rot
@@ -692,7 +705,7 @@ end
 
 -- -------------------------------------------------------------- darbe yıldızı
 
-function VFX.ImpactStar(position: Vector3, size: number?)
+function VFX.ImpactStar(position: Vector3, size: number?, color: Color3?)
 	local cam = workspace.CurrentCamera
 	local s = size or 4
 	local look = if cam then CFrame.lookAt(position, cam.CFrame.Position) else CFrame.new(position)
@@ -700,7 +713,7 @@ function VFX.ImpactStar(position: Vector3, size: number?)
 	local mesh = VFX.Mesh("ImpactStar", s / 1.84)
 	if mesh then
 		local s0 = mesh.Size
-		mesh.Color = BLACK
+		mesh.Color = color or BLACK
 		local h = outline(mesh, 0.1)
 		VFX.Animate(0.24, function(a)
 			local k = if a < 0.2 then outQuint(a / 0.2) * 1.15 else 1.15 - 0.4 * (a - 0.2) / 0.8
@@ -721,7 +734,7 @@ function VFX.ImpactStar(position: Vector3, size: number?)
 		local ang = (i / 7) * math.pi * 2 + math.random() * 0.4
 		local len = s * (0.55 + math.random() * 0.45)
 		local dir = Vector3.new(math.cos(ang), math.sin(ang), 0)
-		local p = VFX.Part({ ClassName = "WedgePart", Size = Vector3.new(0.1, 0.1, 0.1) })
+		local p = VFX.Part({ ClassName = "WedgePart", Size = Vector3.new(0.1, 0.1, 0.1), Color = color or BLACK })
 		table.insert(spikes, { part = p, dir = dir, len = len })
 	end
 	VFX.Animate(0.22, function(a)
@@ -772,7 +785,7 @@ function VFX.Afterimage(character: Model, opts: { [string]: any }?)
 			c.CastShadow = false
 			c.Massless = true
 			c.CFrame = d.CFrame
-			c.Color = BLACK
+			c.Color = o.Color or BLACK
 			c.Material = Enum.Material.Neon
 			c.Transparency = t0
 			if c:IsA("MeshPart") then

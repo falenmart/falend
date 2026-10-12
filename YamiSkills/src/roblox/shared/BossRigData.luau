@@ -1,0 +1,35 @@
+-- OTOMATİK ÜRETİLDİ (src/blender/boss_build.py). Elle değiştirme; Blender script'ini tekrar çalıştır.
+-- Kızıl Kemik İblisi rig verisi: Roblox koordinatı, zemin y=0, boss -Z'ye bakar.
+return {
+	RootCenter = Vector3.new(0.0000, 8.0000, 0.0000),
+	RootSize = Vector3.new(6.0000, 8.0000, 6.0000),
+	HipHeight = 4.0000,
+	Palette = {
+		Color3.fromRGB(236, 232, 222),
+		Color3.fromRGB(205, 18, 22),
+		Color3.fromRGB(70, 9, 24),
+		Color3.fromRGB(10, 10, 12),
+		Color3.fromRGB(118, 8, 14),
+		Color3.fromRGB(2, 2, 2),
+		Color3.fromRGB(170, 20, 30),
+		Color3.fromRGB(190, 186, 178),
+	},
+	Parts = {
+		{ Name = "Pelvis", Parent = "HumanoidRootPart", Pivot = Vector3.new(0.0000, 6.0000, 0.4000), Center = Vector3.new(0.0543, 4.3751, 0.8327), Size = Vector3.new(19.4050, 8.7498, 18.7945), Shape = "Ball", Color = 3, Material = "Fabric" },
+		{ Name = "Chest", Parent = "Pelvis", Pivot = Vector3.new(0.0000, 9.2000, 0.0000), Center = Vector3.new(0.0000, 10.5806, 0.2583), Size = Vector3.new(6.4997, 6.0482, 6.5447), Shape = "Ball", Color = 3, Material = "Fabric" },
+		{ Name = "Head", Parent = "Chest", Pivot = Vector3.new(0.0000, 12.2000, -2.6000), Center = Vector3.new(1.0583, 12.7415, -4.0555), Size = Vector3.new(5.3667, 8.8977, 3.3010), Shape = "Ball", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "Crown", Parent = "Chest", Pivot = Vector3.new(0.0000, 12.6000, -0.6000), Center = Vector3.new(0.0870, 16.2337, 0.4227), Size = Vector3.new(10.6742, 8.8673, 3.1734), Shape = "Spikes", Color = 2, Material = "SmoothPlastic" },
+		{ Name = "ShoulderR", Parent = "Chest", Pivot = Vector3.new(2.8000, 11.6000, -1.4000), Center = Vector3.new(4.8015, 11.8000, -1.3000), Size = Vector3.new(4.9635, 4.0000, 3.9123), Shape = "Ball", Color = 2, Material = "SmoothPlastic" },
+		{ Name = "ShoulderL", Parent = "Chest", Pivot = Vector3.new(-2.8000, 11.6000, -1.4000), Center = Vector3.new(-4.8015, 11.8000, -1.3000), Size = Vector3.new(4.9635, 4.0000, 3.9123), Shape = "Ball", Color = 2, Material = "SmoothPlastic" },
+		{ Name = "BladeR", Parent = "ShoulderR", Pivot = Vector3.new(6.3000, 11.4000, -1.6000), Center = Vector3.new(8.8033, 8.9107, -2.7219), Size = Vector3.new(6.2207, 6.3637, 4.8347), Shape = "Blade", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "BladeL", Parent = "ShoulderL", Pivot = Vector3.new(-6.3000, 11.4000, -1.6000), Center = Vector3.new(-8.8033, 8.9107, -2.7219), Size = Vector3.new(6.2207, 6.3637, 4.8347), Shape = "Blade", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "BladeTipR", Parent = "BladeR", Pivot = Vector3.new(11.4000, 6.6000, -3.2000), Center = Vector3.new(13.8843, 3.8830, -3.7923), Size = Vector3.new(5.6298, 6.7195, 4.2209), Shape = "Blade", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "BladeTipL", Parent = "BladeL", Pivot = Vector3.new(-11.4000, 6.6000, -3.2000), Center = Vector3.new(-13.8843, 3.8830, -3.7923), Size = Vector3.new(5.6298, 6.7195, 4.2209), Shape = "Blade", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ArmR", Parent = "Chest", Pivot = Vector3.new(2.3000, 10.4000, -2.6000), Center = Vector3.new(2.7775, 8.0179, -3.9439), Size = Vector3.new(1.7810, 5.1958, 3.4024), Shape = "Bone", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ArmL", Parent = "Chest", Pivot = Vector3.new(-2.3000, 10.4000, -2.6000), Center = Vector3.new(-2.7855, 8.0179, -3.9416), Size = Vector3.new(1.7649, 5.1958, 3.4070), Shape = "Bone", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ForearmR", Parent = "ArmR", Pivot = Vector3.new(3.2000, 5.9000, -5.2000), Center = Vector3.new(3.2852, 3.5784, -5.6769), Size = Vector3.new(0.8199, 4.7829, 1.5991), Shape = "Bone", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ForearmL", Parent = "ArmL", Pivot = Vector3.new(-3.2000, 5.9000, -5.2000), Center = Vector3.new(-3.2852, 3.5784, -5.6769), Size = Vector3.new(0.8199, 4.7829, 1.5991), Shape = "Bone", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ClawR", Parent = "ForearmR", Pivot = Vector3.new(3.4000, 1.2500, -6.2000), Center = Vector3.new(3.4109, 0.6268, -6.8770), Size = Vector3.new(2.1289, 1.1065, 2.6505), Shape = "Ball", Color = 1, Material = "SmoothPlastic" },
+		{ Name = "ClawL", Parent = "ForearmL", Pivot = Vector3.new(-3.4000, 1.2500, -6.2000), Center = Vector3.new(-3.4109, 0.6268, -6.8770), Size = Vector3.new(2.1289, 1.1065, 2.6505), Shape = "Ball", Color = 1, Material = "SmoothPlastic" },
+	},
+}

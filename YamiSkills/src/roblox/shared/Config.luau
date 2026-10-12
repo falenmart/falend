@@ -245,4 +245,67 @@ Config.Screen = {
 	EffectRadius = 220, -- başkasının yeteneği bu mesafedeyse ekran efektleri sende de olur
 }
 
+-- ============================================================ HAREKET (TPS)
+-- Shift basılı: hızlı koşu (koşu animasyonu Blender'dan). Ctrl: nişan kilidi aç/kapa
+-- (fare ekranın ortasına kilitlenir, karakter kameranın baktığı yöne döner, kamera omuz üstü).
+Config.Movement = {
+	WalkSpeed = 16,
+	RunSpeed = 30,
+	SprintKeys = { Enum.KeyCode.LeftShift, Enum.KeyCode.RightShift, Enum.KeyCode.ButtonL3 },
+	AimKeys = { Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.ButtonL2 },
+	AimToggle = true, -- false: Ctrl basılı tutulduğu sürece nişan
+	AimCameraOffset = Vector3.new(2, 0.6, 0), -- omuz üstü kamera kayması
+	RunFOV = 78,
+	AimFOV = 62,
+	DisableDefaultShiftLock = true, -- Roblox'un kendi Shift Lock'u Shift tuşunu çalmasın
+}
+
+-- ============================================================ BOSS
+--[[
+	Kızıl Kemik İblisi. Model/rig/animasyonlar Blender'da yapıldı (Blender/YamiBoss.blend).
+	Blender/Meshes/YamiBoss_Parts.fbx'i içe aktarıp Assets.Meshes içine koyarsan resimdeki gibi
+	görünür; yoksa aynı iskelet basit parçalarla kurulur.
+	Workspace'e "YamiBossSpawn" adında bir Part koyarsan boss orada doğar.
+	Hasarlar bilerek çok düşük.
+]]
+Config.Boss = {
+	Enabled = true,
+	Name = "Kızıl Kemik İblisi",
+	MaxHealth = 3000,
+	SpawnPosition = Vector3.new(0, 0, -110), -- YamiBossSpawn yoksa (zemin seviyesi)
+	RespawnTime = 25,
+	WalkSpeed = 13,
+	AggroRange = 140,
+	KnockbackResist = 0.15, -- senin vuruşların onu ne kadar itebilir (0-1)
+	Attacks = {
+		Slash = { Range = 17, Cooldown = 3.2, Damage = 3, HitTime = 0.62, Duration = 1.5, Knockback = 35 },
+		Slam = { Range = 22, Cooldown = 7, Damage = 5, HitTime = 1.0, Duration = 2.0, Radius = 16, Knockback = 45 },
+		Lunge = {
+			MinRange = 20,
+			Range = 60,
+			Cooldown = 9,
+			Damage = 4,
+			LungeTime = 0.42,
+			Duration = 1.4,
+			Speed = 95,
+			Knockback = 50,
+		},
+		Roar = {
+			Range = 80,
+			Cooldown = 12,
+			Damage = 2,
+			BurstTime = 0.75,
+			Duration = 1.8,
+			SpikeDelay = 0.9,
+			SpikeRadius = 6,
+			Knockback = 30,
+		},
+	},
+	Colors = {
+		Red = Color3.fromRGB(215, 20, 26),
+		White = Color3.fromRGB(240, 236, 228),
+		Dark = Color3.fromRGB(70, 9, 24),
+	},
+}
+
 return Config

@@ -13,14 +13,20 @@ local AnimPlayer = require(Shared:WaitForChild("AnimPlayer"))
 local SkillFX = require(Shared:WaitForChild("SkillFX"))
 local HUD = require(Shared:WaitForChild("HUD"))
 local KatanaRig = require(Shared:WaitForChild("KatanaRig"))
+local Movement = require(Shared:WaitForChild("Movement"))
+local BossFX = require(Shared:WaitForChild("BossFX"))
 
 local Remotes = Shared:WaitForChild("Remotes")
 local SkillRequest = Remotes:WaitForChild("SkillRequest") :: RemoteEvent
 local SkillEvent = Remotes:WaitForChild("SkillEvent") :: RemoteEvent
+local BossEvent = Remotes:WaitForChild("BossEvent") :: RemoteEvent
+local MovementRequest = Remotes:WaitForChild("MovementRequest") :: RemoteEvent
 
 local player = Players.LocalPlayer
 
 HUD.Init()
+Movement.Init(MovementRequest) -- Shift: koşu, Ctrl: nişan kilidi
+BossFX.Init(BossEvent) -- Kızıl Kemik İblisi animasyon/efekt/can barı
 
 -- ------------------------------------------------------------------- durum
 local character: Model? = nil

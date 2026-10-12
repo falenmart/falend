@@ -13,6 +13,7 @@ local Util = require(Shared:WaitForChild("Util"))
 local KatanaRig = require(Shared:WaitForChild("KatanaRig"))
 local Combat = require(script:WaitForChild("Combat"))
 local Skills = require(script:WaitForChild("Skills"))
+local Boss = require(script:WaitForChild("Boss"))
 
 -- ------------------------------------------------------------------ remotes
 local Remotes = Shared:FindFirstChild("Remotes")
@@ -32,6 +33,8 @@ local function remote(name: string): RemoteEvent
 end
 local SkillRequest = remote("SkillRequest")
 local SkillEvent = remote("SkillEvent")
+local BossEvent = remote("BossEvent")
+local MovementRequest = remote("MovementRequest")
 
 local function log(...)
 	if Config.Debug then
@@ -280,4 +283,34 @@ SkillRequest.OnServerEvent:Connect(function(player: Player, skill: any, data: an
 	end
 end)
 
-print("[YamiSkills] Yami Sukehiro karanlık büyü seti yüklendi (server)")
+-- ------------------------------------------------------- hareket (koşu)
+if Config.Movement.DisableDefaultShiftLock then
+	-- Shift tuşu bizim koşumuz için; Roblox'un Shift Lock'u (sonradan girenler için) kapatılır
+	(game:GetService("StarterPlayer") :: any).EnableMouseLockOption = false
+end
+
+local lastSprint: { [Player]: number } = {}
+MovementRequest.OnServerEvent:Connect(function(player: Player, kind: any, value: any)
+	if kind ~= "Sprint" or type(value) ~= "boolean" then
+		return
+	end
+	local now = os.clock()
+	if (lastSprint[player] or 0) > now - 0.05 then
+		return
+	end
+	lastSprint[player] = now
+	local char = player.Character
+	local hum = Util.getHumanoid(char)
+	if char == nil or hum == nil or hum.Health <= 0 then
+		return
+	end
+	char:SetAttribute("YamiSprinting", value)
+	Combat.SetBaseSpeed(hum, if value then Config.Movement.RunSpeed else Config.Movement.WalkSpeed)
+end)
+Players.PlayerRemoving:Connect(function(p)
+	lastSprint[p] = nil
+end)
+
+Boss.Init(BossEvent)
+
+print("[YamiSkills] Yami Sukehiro karanlık büyü seti + Kızıl Kemik İblisi yüklendi (server)")

@@ -190,7 +190,20 @@ function Combat.Slow(hum: Humanoid, duration: number, speed: number, noJump: boo
 	applyMods(hum)
 end
 
+-- Koşu gibi kalıcı hız değişimi: aktif yavaşlatma varsa bittiğinde bu hıza dönülür
+function Combat.SetBaseSpeed(hum: Humanoid, speed: number)
+	local st = mods[hum]
+	if st then
+		st.base.walk = speed
+	else
+		hum.WalkSpeed = speed
+	end
+end
+
 function Combat.Stun(victim: Victim, duration: number)
+	if victim.model:GetAttribute("YamiBoss") then
+		duration *= 0.3 -- boss'lar kısa sersemler
+	end
 	Combat.Slow(victim.humanoid, duration, 3, true)
 	local untilT = workspace:GetServerTimeNow() + duration
 	local cur = victim.model:GetAttribute("YamiStunUntil")
@@ -209,6 +222,11 @@ end
 -- Hedefi velocity hızıyla duration boyunca iter/havalandırır (oyuncu karakterlerinde de çalışır:
 -- sunucunun eklediği LinearVelocity, karakterin sahibi olan client'ta simüle edilir).
 function Combat.Knockback(root: BasePart, velocity: Vector3, duration: number?)
+	local owner = root.Parent
+	local resist = owner and owner:GetAttribute("KnockbackResist")
+	if type(resist) == "number" then
+		velocity *= resist
+	end
 	for _, old in ipairs(root:GetChildren()) do
 		if old.Name == "YamiKnockback" or old.Name == "YamiKnockbackAtt" then
 			old:Destroy()
@@ -272,6 +290,27 @@ function Combat.FlingParts(cframe: CFrame, size: Vector3, velocity: Vector3, exc
 			end
 		end
 	end
+end
+
+-- Sadece oyuncu karakterleri (boss saldırıları için)
+function Combat.PlayersInRadius(position: Vector3, radius: number, exclude: Instance?): { Victim }
+	local out = {}
+	for _, v in ipairs(Combat.QueryRadius(position, radius, exclude :: any)) do
+		if v.player then
+			table.insert(out, v)
+		end
+	end
+	return out
+end
+
+function Combat.PlayersInBox(cframe: CFrame, size: Vector3, exclude: Instance?): { Victim }
+	local out = {}
+	for _, v in ipairs(Combat.QueryBox(cframe, size, exclude :: any)) do
+		if v.player then
+			table.insert(out, v)
+		end
+	end
+	return out
 end
 
 -- -------------------------------------------------------------- mermi

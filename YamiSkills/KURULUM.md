@@ -20,6 +20,36 @@ Animasyonlar ve VFX meshleri Blender'da yapıldı. Script'ler hazır `.rbxm` dos
 
 HUD'daki kutulara tıklayarak/dokunarak da yetenek kullanabilirsin (mobil uyumlu).
 
+### Hareket (TPS kontrolleri)
+
+| Tuş | Ne yapar |
+|---|---|
+| **Shift** (basılı tut) | Hızlı koşu (16 → 30 hız). Blender'da yapılmış **koşu animasyonu** oynar, herkes görür. Görüş açısı hafif açılır. |
+| **Ctrl** (aç/kapa) | **Nişan kilidi**: fare ekranın ortasına kilitlenir, kamera omuz üstüne kayar, karakter hep kameranın baktığı yöne döner, ortada nişangâh çıkar. Yetenekler nişangâhın yönüne atılır. |
+
+Mobilde ekranda **KOŞ** ve **NİŞAN** butonları çıkar. Roblox'un kendi *Shift Lock* özelliği Shift'i çalmasın diye
+kapatılır (`Config.Movement.DisableDefaultShiftLock`).
+
+### Boss: Kızıl Kemik İblisi
+
+![Boss](Previews/boss_model.png)
+
+Resimdeki gibi: beyaz kemik maske (tek siyah göz, boynuzlar, dişli ağız), arkasında kırmızı/beyaz diken taç, kırmızı
+kaslı omuzlar, yere uzanan dev beyaz bıçak kollar, bordo yırtık pelerin. Modeli, rigi ve 7 animasyonu Blender'da
+yapıldı (`Blender/YamiBoss.blend`). Oyunculara yürür ve saldırır; **hasarları bilerek çok düşük** (2–5).
+
+| Saldırı | Ne yapar | Hasar |
+|---|---|---|
+| Kesik (yakın) | Sağ bıçakla önünü süpüren dev kırmızı hilal | 3 |
+| Yere Vuruş | İki bıçağı kaldırıp önüne çakar; yerde kırmızı uyarı çemberi, krater, uçan taşlar | 5 |
+| Atılma (orta) | Eğilip ileri fırlar, kırmızı gölge-izler | 4 |
+| Kükreme (uzak) | Taçtan kırmızı enerji patlar, yakındakileri iter; birkaç saniye sonra **oyuncuların altından dikenler fışkırır** (uyarı çemberinden kaç!) | 2 |
+
+- Can: 3000 (ekranın üstünde can barı). Ölünce dağılır, 25 sn sonra yeniden doğar.
+- Senin yeteneklerin ona işler (itme direnci var, sersemleme kısa sürer).
+- Nerede doğacağı: Workspace'e **YamiBossSpawn** adında bir Part koy (boss onun baktığı yöne bakar). Yoksa `Config.Boss.SpawnPosition`.
+- Ayarlar: `Config.Boss` (can, hız, menzil, her saldırının hasarı/bekleme süresi). Kapatmak için `Enabled = false`.
+
 ---
 
 ## 2. Paket içeriği
@@ -34,7 +64,8 @@ YamiSkills/
 │  └─ YamiSkills_Demo.rbxl                        ← hazır demo yer (aç → Play)
 ├─ Blender/
 │  ├─ YamiVFX.blend                  ← tüm VFX meshleri + katana + kılıf (kaynak)
-│  ├─ YamiRig_Animations.blend       ← R15 rig + 11 animasyon (Action) + Roblox exporter
+│  ├─ YamiRig_Animations.blend       ← R15 rig + 12 animasyon (koşu dahil) + Roblox exporter
+│  ├─ YamiBoss.blend                 ← boss modeli + rig + 7 animasyon + exporter
 │  ├─ Meshes/*.fbx                   ← Roblox'a aktarılacak meshler
 │  ├─ Textures/*.png                 ← dokular (T_ = mesh, P_ = parçacık)
 │  └─ Sounds/*.ogg                   ← isteğe bağlı özel ses efektleri
@@ -102,6 +133,10 @@ Mesh yokken efektler aynı şekilde Part'larla çizilir; meshlerle çok daha gü
 5. Bu modeli `ReplicatedStorage > YamiSkills > Assets > Meshes` içine sürükle. (İçindeki MeshPart'ların
    adlarını değiştirme: `SlashArc, DimensionRift, ShockRing, Swirl, Cocoon, Rock1, Rock2, Rock3, Shard, ImpactStar, Katana, KatanaSaya`.)
 6. Play → hilal kesikler, boyut yarığı, koza, kayalar ve **Blender'daki katana + kılıf** artık mesh olarak görünür.
+7. **Boss için de aynısı:** `Blender/Meshes/YamiBoss_Parts.fbx`'i Import 3D ile aktar, oluşan modeli yine
+   `Assets > Meshes` içine sürükle (parçalar `Boss_Pelvis, Boss_Head, Boss_Crown, Boss_BladeR` … adında).
+   Boss bundan sonra doğduğunda resimdeki görünümle çıkar. Mesh yokken aynı iskelet basit parçalarla
+   (top, bıçak, kemik, dikenler) kurulur, animasyonlar yine çalışır.
 
 Bir mesh ters/yan dönük görünürse `Config.MeshRotation` içinden derece ver (örn. `SlashArc = Vector3.new(0, 180, 0)`).
 
@@ -109,8 +144,9 @@ Bir mesh ters/yan dönük görünürse `Config.MeshRotation` içinden derece ver
 
 ## 6. Animasyonlar
 
-11 animasyon Blender'da yapıldı ve `YamiSkills/Animations` içinde **KeyframeSequence** olarak geliyor:
-`Hold, Equip, M1_1, M1_2, M1_3, M1_4, BlackMoon, DeathThrust, BlackCocoon, DimensionSlash, BlackBlade`.
+Blender'da yapılan animasyonlar `YamiSkills/Animations` içinde **KeyframeSequence** olarak geliyor:
+- Oyuncu (R15): `Hold, Equip, M1_1, M1_2, M1_3, M1_4, BlackMoon, DeathThrust, BlackCocoon, DimensionSlash, BlackBlade, Run`
+- Boss: `Boss_Idle, Boss_Walk, Boss_Slash, Boss_Slam, Boss_Lunge, Boss_Roar, Boss_Death`
 
 **Yükleme yapmadan çalışır:** `Config.AnimationIds` boşken dahili oynatıcı KeyframeSequence'ları
 doğrudan oynatır (Studio'da da yayınlanmış oyunda da; herkes birbirinin animasyonunu görür).
@@ -202,5 +238,8 @@ ve ID'leri `Config.Textures.InkSmoke / Streak / Crack / Shards` alanlarına yaz.
 | Mesh ters/yan | `Config.MeshRotation` ile döndür. |
 | Efektler çok sarsıyor | `Config.Screen.ShakeMultiplier = 0.5` veya `ImpactFrames = false` |
 | Kılıç kalçada görünmüyor | Karakter R15 değil ya da `LowerTorso/RightHand` yok (özel rig). |
+| Shift ile koşmuyorum | Oyunun başka bir script'i WalkSpeed'i sürekli değiştiriyor olabilir; `Config.Movement.RunSpeed` |
+| Ctrl'de fare kilitlenmiyor | Studio'da önce oyun penceresine tıkla. Başka bir kamera script'i varsa çakışabilir. |
+| Boss çıkmıyor | `Config.Boss.Enabled = true` mı? Output'ta hata var mı? `SpawnPosition` zeminin üstünde mi? |
 
 İyi oyunlar! 闇魔法

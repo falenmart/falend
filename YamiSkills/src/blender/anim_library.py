@@ -381,3 +381,42 @@ BLACK_BLADE = {
 }
 
 ALL = [HOLD, EQUIP, M1_1, M1_2, M1_3, M1_4, BLACK_MOON, DEATH_THRUST, BLACK_COCOON, DIMENSION_SLASH, BLACK_BLADE]
+
+
+# ===================================================================== RUN (Shift)
+# Anime tarzı hızlı koşu: gövde öne eğik, kollar pompalı, bacaklar IK ile adım atar.
+def _run_key(side, phase):
+    """side: 1 = sağ ayak önde, -1 = sol ayak önde. phase: 'contact' | 'pass'."""
+    s = side
+    if phase == "contact":
+        r_foot = (0.48, 0.32, -1.05) if s == 1 else (0.48, 0.75, 0.85)
+        l_foot = (-0.48, 0.75, 0.85) if s == 1 else (-0.48, 0.32, -1.05)
+        root = (0, -0.28, 0, -16, 6 * s, 0)
+        r_sh, l_sh = (-55 * s, 0, 4), (55 * s, 0, -4)
+    else:
+        r_foot = (0.48, 0.28, -0.05) if s == 1 else (0.48, 1.15, -0.35)
+        l_foot = (-0.48, 1.15, -0.35) if s == 1 else (-0.48, 0.28, -0.05)
+        root = (0, 0.05, 0, -14, 0, 0)
+        r_sh, l_sh = (-15 * s, 0, 4), (15 * s, 0, -4)
+    return pose(
+        root=root, waist=(-4, -10 * (s if phase == "contact" else 0), 0), neck=(12, 4 * s, 0),
+        r_arm={"fk": (r_sh, (75, 0, 0), (10, 0, 0))},
+        l_arm={"fk": (l_sh, (75, 0, 0), (10, 0, 0))},
+        r_leg={"foot": r_foot, "pitch": -10 if r_foot[1] > 0.5 else 0},
+        l_leg={"foot": l_foot, "pitch": -10 if l_foot[1] > 0.5 else 0},
+    )
+
+
+RUN = {
+    "name": "Run", "priority": "Movement", "loop": True, "parts": None,
+    "keys": [
+        (0.0, _run_key(1, "contact"), "smooth"),
+        (0.17, _run_key(1, "pass"), "smooth"),
+        (0.34, _run_key(-1, "contact"), "smooth"),
+        (0.51, _run_key(-1, "pass"), "smooth"),
+        (0.68, _run_key(1, "contact"), "smooth"),
+    ],
+    "markers": {},
+}
+
+ALL.append(RUN)
