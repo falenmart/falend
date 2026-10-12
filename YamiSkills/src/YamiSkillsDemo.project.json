@@ -1,0 +1,37 @@
+{
+  "name": "YamiSkillsDemo",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "YamiSkills": { "$path": "roblox/shared" }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "YamiSkillsServer": { "$path": "roblox/server" },
+      "DemoDummies": { "$path": "roblox/demo/DemoDummies.server.luau" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "YamiSkillsClient": { "$path": "roblox/client" }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "DemoArena": { "$path": "roblox/demo/DemoArena.rbxmx" }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "ClockTime": 15.6,
+        "Brightness": 2.2,
+        "GlobalShadows": true,
+        "EnvironmentDiffuseScale": 1,
+        "EnvironmentSpecularScale": 1
+      },
+      "Atmosphere": { "$path": "roblox/demo/Atmosphere.rbxmx" }
+    }
+  }
+}

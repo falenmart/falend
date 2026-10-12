@@ -1,0 +1,4 @@
+Blender/Meshes/YamiVFX_AllMeshes.fbx dosyasini Studio'da 3D Importer ile ice aktar (Avatar/Home > Import 3D).
+Olusan modeli (icindeki MeshPart'larla birlikte) bu "Meshes" klasorunun icine surukle.
+Isimler: SlashArc, DimensionRift, ShockRing, Swirl, Cocoon, Rock1, Rock2, Rock3, Shard, ImpactStar, Katana, KatanaSaya
+Mesh yoksa efektler parcalarla (Part) cizilir; sistem yine calisir.

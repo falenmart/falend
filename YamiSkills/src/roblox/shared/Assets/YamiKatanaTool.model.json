@@ -1,0 +1,9 @@
+{
+  "className": "Tool",
+  "properties": {
+    "RequiresHandle": false,
+    "CanBeDropped": false,
+    "ManualActivationOnly": false,
+    "ToolTip": "Yami Sukehiro - Sol tık: kombo | Z X C V F: yetenekler"
+  }
+}
