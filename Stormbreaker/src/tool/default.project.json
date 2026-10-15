@@ -1,0 +1,23 @@
+{
+  "name": "Stormbreaker",
+  "tree": {
+    "$className": "Tool",
+    "$properties": {
+      "ToolTip": "Stormbreaker",
+      "CanBeDropped": false,
+      "RequiresHandle": true,
+      "Grip": {
+        "CFrame": {
+          "position": [0, -1.3, 0],
+          "orientation": [[0, 0, -1], [0, 1, 0], [1, 0, 0]]
+        }
+      }
+    },
+    "StormbreakerSetup": { "$path": "StormbreakerSetup.server.luau" },
+    "SurfaceAppearances": {
+      "$className": "Folder",
+      "Head": { "$className": "SurfaceAppearance" },
+      "Handle": { "$className": "SurfaceAppearance" }
+    }
+  }
+}
